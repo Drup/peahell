@@ -87,7 +87,7 @@ module Make (L : Language.S) = struct
     match L.file_parser with
     | Some f ->
       let cmds = read_file (Input.wrap f) filename in
-      List.fold_left (L.exec use_file) ctx cmds
+      L.exec use_file ctx cmds
     | None ->
       Report.fail "Cannot load files, only interactive shell is available"
 

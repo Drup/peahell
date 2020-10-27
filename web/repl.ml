@@ -50,8 +50,8 @@ module Make (L : Language.S) = struct
     match L.file_parser with
     | Some f ->
       let cmds = read_file (Input.wrap f) (filename, content) in
-      List.fold_left
-        (L.exec (fun _ _ -> Report.fail "Cannot load files in the web toplevel"))
+      L.exec
+        (fun _ _ -> Report.fail "Cannot load files in the web toplevel")
         ctx cmds
     | None ->
       Report.fail "Cannot load files, only interactive shell is available"
