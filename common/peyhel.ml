@@ -10,6 +10,9 @@ let print_parens ?(max_level=9999) ?(at_level=0) ppf =
       Format.kfprintf (fun ppf -> Format.fprintf ppf "@]") ppf
     end
 
+module Location = Location
+module Report = Report
+
 type filename = Language.filename
 
 (** The definition of a programming language *)

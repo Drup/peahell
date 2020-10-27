@@ -11,6 +11,9 @@
 val print_parens : ?max_level:int -> ?at_level:int ->
   Format.formatter -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
+module Location = Location
+module Report = Report
+
 type filename = Language.filename
 
 (** The definition of a programming language *)
