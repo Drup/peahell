@@ -55,7 +55,7 @@ module Make (L : Language.S) = struct
     let lex = Lexing.from_channel fh in
     lex.Lexing.lex_curr_p <- {lex.Lexing.lex_curr_p with Lexing.pos_fname = fn};
     try
-      let terms = parser lex in
+      let terms = Input.wrap (parser fn) lex in
       close_in fh;
       terms
     with
@@ -86,7 +86,7 @@ module Make (L : Language.S) = struct
   let rec use_file ctx filename =
     match L.file_parser with
     | Some f ->
-      let cmds = read_file (Input.wrap f) filename in
+      let cmds = read_file f filename in
       L.exec use_file ctx cmds
     | None ->
       Report.fail "Cannot load files, only interactive shell is available"

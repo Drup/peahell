@@ -42,14 +42,14 @@ module Make (L : Language.S) = struct
   let read_file parser (fn, str) =
     let lex = Lexing.from_string (str ^"\n") in
     lex.Lexing.lex_curr_p <- {lex.Lexing.lex_curr_p with Lexing.pos_fname = fn};
-    let terms = parser lex in
+    let terms = Input.wrap (parser fn) lex in
     terms
           
   (** Load directives from the given file. *)
   let use_file ctx (filename, content) =
     match L.file_parser with
     | Some f ->
-      let cmds = read_file (Input.wrap f) (filename, content) in
+      let cmds = read_file f (filename, content) in
       L.exec
         (fun _ _ -> Report.fail "Cannot load files in the web toplevel")
         ctx cmds
