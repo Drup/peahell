@@ -1,0 +1,23 @@
+opam-version: "2.0"
+name: "peyhel-jsoo"
+maintainer: "Gabriel Radanne <drupyog@zoho.com>"
+authors: "Gabriel Radanne <drupyog@zoho.com>"
+homepage: "https://github.com/Drup/peyhel"
+bug-reports: "https://github.com/Drup/peyhel/issues"
+license: "ISC"
+dev-repo: "git+https://github.com/Drup/peyhel.git"
+
+build: [
+  ["dune" "subst"]{pinned}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+
+
+depends: [
+  "ocaml" { >= "4.03.0" }
+  "dune" {build & >= "1.0"}
+  "peyhel"
+  "js_of_ocaml"
+  "js_of_ocaml-tyxml"
+]

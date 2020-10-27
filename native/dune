@@ -1,0 +1,6 @@
+(library
+ (name peyhel_native)
+ (public_name peyhel.native)
+ (implements peyhel)
+ (libraries unix linenoise)
+)
