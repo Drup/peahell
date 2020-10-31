@@ -32,16 +32,23 @@ let batch_mode_printer : report_printer =
   in
   let pp_txt ppf txt = Format.fprintf ppf "@[%t@]" txt in
   let pp self ppf ({ kind; main; sub } as report) =
-    Format.fprintf ppf "@[<v>%a%a: %a@,%a@]@."
-      (self.pp_main_loc self report) main.loc
-      (self.pp_report_kind self report) kind
-      (self.pp_main_txt self report) main.data
-      (Fmt.list ~sep:Fmt.cut @@ self.pp_main_loc self report) sub
+    match main.loc with
+    | Location.Nowhere ->
+      Format.fprintf ppf "@[<v>%a%a@,%a@]@."
+        (self.pp_report_kind self report) kind
+        (self.pp_main_txt self report) main.data
+        (Fmt.list ~sep:Fmt.cut @@ self.pp_main_loc self report) sub
+    | loc ->
+      Format.fprintf ppf "@[<v>%a@ %a%a@,%a@]@."
+        (self.pp_main_loc self report) loc
+        (self.pp_report_kind self report) kind
+        (self.pp_main_txt self report) main.data
+        (Fmt.list ~sep:Fmt.cut @@ self.pp_main_loc self report) sub
   in
   let pp_report_kind _self _ ppf = function
-    | Error -> Format.fprintf ppf "@{<error>Error@}"
-    | Warning w -> Format.fprintf ppf "@{<warning>Warning@} %s" w
-    | Info w -> Format.fprintf ppf "@{<info>Info@} %s" w
+    | Error -> Format.fprintf ppf "@{<error>Error@}: "
+    | Warning w -> Format.fprintf ppf "@{<warning>Warning@} %s: " w
+    | Info w -> Format.fprintf ppf "@{<info>Info@} %s: " w
     | Output -> ()
   in
   let pp_main_loc self report ppf loc =
@@ -57,9 +64,6 @@ let report_printer = ref batch_mode_printer
 let pp_report ppf report =
   let printer = !report_printer in
   printer.pp printer ppf report
-
-(* Printers *)
-
 
 (* Register *)
 

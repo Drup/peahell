@@ -25,7 +25,7 @@ let pp ppf loc =
     let begin_line = begin_pos.Lexing.pos_lnum in
     let filename = begin_pos.Lexing.pos_fname in
     if String.length filename != 0 then
-      Format.fprintf ppf "file %S, line %d, charaters %d-%d"
+      Format.fprintf ppf "file %S, line %d, characters %d-%d"
         filename begin_line begin_char end_char
     else
       Format.fprintf ppf "line %d, characters %d-%d"
