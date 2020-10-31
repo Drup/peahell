@@ -34,7 +34,7 @@ let wrap parse lexbuf =
   try
     parse lexbuf
   with
-  | Parsing.Parse_error -> 
+  | _ -> 
     let loc =
       Location.Location (Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf)
     in
