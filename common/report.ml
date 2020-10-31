@@ -86,8 +86,9 @@ let report_exception ppf exn =
     | exception exn when n > 0 -> loop (n-1) exn
   in
   try loop 5 exn with
-  | _exn ->
-    Printexc.print_backtrace stderr
+  | exn ->
+    Printexc.print_backtrace stderr;
+    raise exn
 
 (** smart constructors *)
 
