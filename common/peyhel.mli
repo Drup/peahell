@@ -13,6 +13,7 @@ val print_parens : ?max_level:int -> ?at_level:int ->
 
 module Location = Location
 module Report = Report
+module Input = Input
 
 type filename = Language.filename
 

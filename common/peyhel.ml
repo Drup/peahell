@@ -12,6 +12,7 @@ let print_parens ?(max_level=9999) ?(at_level=0) ppf =
 
 module Location = Location
 module Report = Report
+module Input = Input
 
 type filename = Language.filename
 
