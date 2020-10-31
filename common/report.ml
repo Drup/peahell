@@ -6,6 +6,7 @@ type report_kind =
   | Error
   | Warning of string
   | Info of string
+  | Output
 
 type report = {
   kind : report_kind;
@@ -41,6 +42,7 @@ let batch_mode_printer : report_printer =
     | Error -> Format.fprintf ppf "@{<error>Error@}"
     | Warning w -> Format.fprintf ppf "@{<warning>Warning@} %s" w
     | Info w -> Format.fprintf ppf "@{<info>Info@} %s" w
+    | Output -> ()
   in
   let pp_main_loc self report ppf loc =
     pp_loc self report ppf loc
@@ -99,6 +101,10 @@ let warnf ?(loc = Nowhere) ?(sub = []) w =
 let infof ?(loc = Nowhere) ?(sub = []) i =
   Format.kdprintf (fun data ->
       pp_report Fmt.stdout { kind = Info i ; main = { loc; data } ; sub})
+
+let printf ?(loc = Nowhere) ?(sub = []) =
+  Format.kdprintf (fun data ->
+      pp_report Fmt.stdout { kind = Output ; main = { loc; data } ; sub})
 
 (** A builtin error, for convenience *)
 

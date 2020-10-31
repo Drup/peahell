@@ -1,10 +1,14 @@
+val printf :
+  ?loc:Location.loc ->
+  ?sub:Location.loc list ->
+  ('a, Format.formatter, unit, unit) format4 -> 'a
 
-val warnf :
+val infof :
   ?loc:Location.loc ->
   ?sub:Location.loc list ->
   string -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
-val infof :
+val warnf :
   ?loc:Location.loc ->
   ?sub:Location.loc list ->
   string -> ('a, Format.formatter, unit, unit) format4 -> 'a
@@ -15,6 +19,7 @@ type report_kind =
   | Error
   | Warning of string
   | Info of string
+  | Output
 
 type report = {
   kind : report_kind;
