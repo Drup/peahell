@@ -89,12 +89,11 @@ let report_exception ppf exn =
     | Some r -> pp_report ppf r
     | exception exn when n > 0 -> loop (n-1) exn
   in
-  try loop 5 exn with
-  | exn ->
-    Printexc.print_backtrace stderr;
-    raise exn
+  loop 5 exn
 
-(** smart constructors *)
+let () = Printexc.record_backtrace true
+
+(** Smart constructors *)
 
 let errorf ?(loc = Nowhere) ?(sub = []) =
   Format.kdprintf (fun data -> { kind = Error; main = { loc; data } ; sub})
