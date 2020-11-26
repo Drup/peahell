@@ -34,12 +34,12 @@ let batch_mode_printer : report_printer =
   let pp self ppf ({ kind; main; sub } as report) =
     match main.loc with
     | Location.Nowhere ->
-      Format.fprintf ppf "@[<v>%a%a@,%a@]@."
+      Format.fprintf ppf "@[<v>%a%a@,%a@]"
         (self.pp_report_kind self report) kind
         (self.pp_main_txt self report) main.data
         (Fmt.list ~sep:Fmt.cut @@ self.pp_main_loc self report) sub
     | loc ->
-      Format.fprintf ppf "@[<v>%a@ %a%a@,%a@]@."
+      Format.fprintf ppf "@[<v>%a@ %a%a@,%a@]"
         (self.pp_main_loc self report) loc
         (self.pp_report_kind self report) kind
         (self.pp_main_txt self report) main.data
@@ -109,6 +109,10 @@ let infof ?(loc = Nowhere) ?(sub = []) i =
 let printf ?(loc = Nowhere) ?(sub = []) =
   Format.kdprintf (fun data ->
       pp_report Fmt.stdout { kind = Output ; main = { loc; data } ; sub})
+
+let fprintf ?(loc = Nowhere) ?(sub = []) ppf =
+  Format.kdprintf (fun data ->
+      pp_report ppf { kind = Output ; main = { loc; data } ; sub})
 
 (** A builtin error, for convenience *)
 

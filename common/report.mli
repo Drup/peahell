@@ -3,6 +3,12 @@ val printf :
   ?sub:Location.loc list ->
   ('a, Format.formatter, unit, unit) format4 -> 'a
 
+val fprintf :
+  ?loc:Location.loc ->
+  ?sub:Location.loc list ->
+  Format.formatter ->
+  ('a, Format.formatter, unit, unit) format4 -> 'a
+
 val infof :
   ?loc:Location.loc ->
   ?sub:Location.loc list ->

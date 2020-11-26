@@ -13,7 +13,8 @@ module Make (L : Language.S) = struct
 
 
   (** Should the interactive shell be run? *)
-  let interactive_shell = ref true
+  type mode = Batch | Interactive | Expect
+  let mode = ref Interactive
 
   (** The usage message. *)
   let usage =
@@ -35,9 +36,14 @@ module Make (L : Language.S) = struct
            print_endline (L.name ^ " " ^ "(" ^ Sys.os_type ^ ")");
            exit 0),
        " Print language information and exit");
-      ("-n",
-       Arg.Clear interactive_shell,
-       " Do not run the interactive toplevel");
+      ("-m",
+       Arg.Symbol (["top";"batch";"expect"],
+                   function "top" -> mode := Interactive
+                          | "expect" ->  mode := Expect
+                          | "batch" ->  mode := Batch
+                          | _ -> ()
+                  ),
+       " Mode for running");
       ("-l",
        Arg.String (fun str -> add_file str),
        "<file> Load <file> into the initial environment")
@@ -46,8 +52,7 @@ module Make (L : Language.S) = struct
 
   (** Treat anonymous arguments as files to be run. *)
   let anonymous str =
-    add_file str;
-    interactive_shell := false
+    add_file str
 
   (** Parse the contents from a file, using a given [parser]. *)
   let read_file parser fn =
@@ -87,10 +92,45 @@ module Make (L : Language.S) = struct
     match L.file_parser with
     | Some f ->
       let cmds = read_file f filename in
-      L.exec use_file ctx cmds
+      L.exec Format.std_formatter use_file ctx cmds
     | None ->
       Report.fail "Cannot load files, only interactive shell is available"
 
+  let batch ctx filenames =
+    List.fold_left use_file ctx filenames
+
+  (** Expect mode *)
+  let expect ctx filename =
+    match L.expect_parser with
+    | Some (open_string, end_string, f) ->
+      let ic = open_in filename in
+      let l = read_file f filename in
+      let rec walk_sections prev_index ctx = function
+        | [] -> ()
+        | (input, index1, index2) :: t ->
+          seek_in ic prev_index;
+          let txt = really_input_string ic (index1 - prev_index) in
+          print_endline txt;
+          print_endline open_string;
+          let ctx, s =
+            let b = Buffer.create 7 in
+            let ppf = Format.formatter_of_buffer b in
+            let ctx =
+              try L.exec ppf use_file ctx input
+              with err ->
+                Format.fprintf ppf "%a@." Report.report_exception err;
+                ctx
+            in
+            ctx, String.trim (Buffer.contents b)
+          in
+          print_endline s;
+          print_endline end_string;
+          walk_sections index2 ctx t
+      in
+      walk_sections 0 ctx l
+    | None ->
+      Report.fail "I'm sorry, this language does not support expect mode"
+  
   (** Interactive toplevel *)
   let toplevel ctx =
     let eof = match Sys.os_type with
@@ -111,7 +151,7 @@ module Make (L : Language.S) = struct
       while true do
         try
           let cmd = read_toplevel (Input.wrap toplevel_parser) () in
-          ctx := L.exec use_file !ctx cmd
+          ctx := L.exec Format.std_formatter use_file !ctx cmd
         with
         | Sys.Break -> prerr_endline "Interrupted."
         | err -> Format.eprintf "%a@." Report.report_exception err
@@ -135,8 +175,19 @@ module Make (L : Language.S) = struct
     Format.set_max_indent 30 ;
     try
       (* Run and load all the specified files. *)
-      let ctx = List.fold_left use_file L.initial_environment !files in
-      if !interactive_shell then toplevel ctx
+      match !mode with
+      | Batch -> 
+        let _ = batch L.initial_environment !files in
+        ()
+      | Interactive -> 
+        let ctx = batch L.initial_environment !files in
+        toplevel ctx
+      | Expect ->
+        let file = match !files with
+          | [fn] -> fn
+          | _ -> Report.fail "Expect mode only accept one file"
+        in
+        expect L.initial_environment file
     with err ->
       Format.eprintf "%a@." Report.report_exception err;
       exit 1
