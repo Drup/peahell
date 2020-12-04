@@ -1,4 +1,4 @@
-# Peahell
+# Peahell ![Build](https://github.com/Drup/peahell/workflows/Build/badge.svg) [![docs](https://img.shields.io/badge/doc-online-blue.svg)][doc]
 
 Bunch of utilities for PL experiments. Originally based on boilerplates contained in the [plzoo](http://andrej.com/plzoo/), expanded to satisfy my use-cases. Examples will come eventually.
 
@@ -13,3 +13,5 @@ To install :
 ```
 opam install https://github.com/Drup/peahell
 ```
+
+[doc]: https://drup.github.io/peahell/master/

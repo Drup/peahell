@@ -1,0 +1,94 @@
+name: Build
+
+on:
+  - pull_request
+  - push
+  
+jobs:
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+        ocaml-version:
+          - 4.11.1
+          - 4.10.1
+        exclude:
+          - os: ubuntu-latest
+            ocaml-version: 4.11.1
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Use OCaml ${{ matrix.ocaml-version }}
+        uses: avsm/setup-ocaml@v1
+        with:
+          ocaml-version: ${{ matrix.ocaml-version }}
+
+      - run: opam pin add . --no-action
+      - run: opam install peahell --deps-only
+
+      - run: opam exec -- dune build -p peahell
+      - run: opam exec -- dune runtest -p peahell
+
+  build-all:
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.vars.outputs.ref }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Use OCaml 4.11.1
+        uses: avsm/setup-ocaml@v1
+        with:
+          ocaml-version: 4.11.1
+
+      - run: opam pin add . --no-action
+      - run: opam install . --deps-only
+
+      - run: opam exec -- dune build
+      - run: opam exec -- dune runtest
+
+      - run: opam install odoc
+      - run: opam exec -- dune build @doc
+
+      - id: vars
+        shell: bash
+        run: echo "##[set-output name=ref;]$(echo ${GITHUB_REF#refs/heads/})"
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: doc-${{ steps.vars.outputs.ref }}
+          path: _build/default/_doc/_html/peahell/
+
+  doc:
+    needs: build-all
+    if: github.event_name == 'push' &&
+        ( github.ref == 'refs/heads/master' || startsWith(github.ref,'refs/tags') )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v2
+        with:
+          ref: gh-pages
+      - name: Remove previous doc
+        run: rm -rf ${{ needs.build-all.outputs.ref }}
+      - name: Retrieve New doc
+        uses: actions/download-artifact@v2
+        with:
+          name: doc-${{ needs.build-all.outputs.ref }}
+          path: ${{ needs.build-all.outputs.ref }}
+      - name: Deploy Doc
+        run: |
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git config user.name "${{ github.actor }}"
+          git add ${{ needs.build-all.outputs.ref }}
+          git commit -m "Deploy ${GITHUB_SHA}"
+          git push -f "https://${{ github.actor }}:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
