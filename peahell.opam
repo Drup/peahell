@@ -18,4 +18,5 @@ depends: [
   "ocaml" { >= "4.03.0" }
   "dune" {build & >= "1.0"}
   "fmt"
+  "linenoise"
 ]
