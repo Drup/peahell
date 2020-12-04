@@ -1,11 +1,11 @@
 opam-version: "2.0"
-name: "peyhel-jsoo"
+name: "peahell-jsoo"
 maintainer: "Gabriel Radanne <drupyog@zoho.com>"
 authors: "Gabriel Radanne <drupyog@zoho.com>"
-homepage: "https://github.com/Drup/peyhel"
-bug-reports: "https://github.com/Drup/peyhel/issues"
+homepage: "https://github.com/Drup/peahell"
+bug-reports: "https://github.com/Drup/peahell/issues"
 license: "ISC"
-dev-repo: "git+https://github.com/Drup/peyhel.git"
+dev-repo: "git+https://github.com/Drup/peahell.git"
 
 build: [
   ["dune" "subst"]{pinned}
@@ -17,7 +17,7 @@ build: [
 depends: [
   "ocaml" { >= "4.03.0" }
   "dune" {build & >= "1.0"}
-  "peyhel"
+  "peahell"
   "js_of_ocaml"
   "js_of_ocaml-tyxml"
 ]

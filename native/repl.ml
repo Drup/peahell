@@ -106,7 +106,7 @@ module Make (L : Language.S) = struct
       let ic = open_in filename in
       let l = read_file f filename in
       let rec walk_sections prev_index ctx = function
-        | [] -> ()
+        | [] -> print_newline ()
         | (input, index1, index2) :: t ->
           seek_in ic prev_index;
           let txt = really_input_string ic (index1 - prev_index) in
@@ -124,7 +124,7 @@ module Make (L : Language.S) = struct
             ctx, String.trim (Buffer.contents b)
           in
           print_endline s;
-          print_endline end_string;
+          print_string end_string;
           walk_sections index2 ctx t
       in
       walk_sections 0 ctx l

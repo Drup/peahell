@@ -1,7 +1,7 @@
 (library
- (name peyhel_jsoo)
- (public_name peyhel-jsoo)
- (implements peyhel)
+ (name peahell_jsoo)
+ (public_name peahell-jsoo)
+ (implements peahell)
  (libraries js_of_ocaml js_of_ocaml-tyxml)
  (preprocess (pps js_of_ocaml-ppx))
 )
