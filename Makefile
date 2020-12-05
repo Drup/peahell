@@ -1,4 +1,4 @@
-NAME=babypl
+NAME=peahell
 DOCDIR=.gh-pages
 
 all:
@@ -9,6 +9,9 @@ test:
 
 clean:
 	dune clean
+
+doc:
+	dune build @doc
 
 $(DOCDIR)/.git:
 	mkdir -p $(DOCDIR)
