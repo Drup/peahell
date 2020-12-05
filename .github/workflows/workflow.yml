@@ -66,7 +66,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: doc-${{ steps.vars.outputs.ref }}
-          path: _build/default/_doc/_html/peahell/
+          path: _build/default/_doc/_html/
 
   doc:
     needs: build-all
