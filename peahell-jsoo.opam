@@ -6,6 +6,7 @@ homepage: "https://github.com/Drup/peahell"
 bug-reports: "https://github.com/Drup/peahell/issues"
 license: "MIT"
 dev-repo: "git+https://github.com/Drup/peahell.git"
+synopsis: "Tools and utilities to make toy programming languages Web REPL"
 
 build: [
   ["dune" "subst"]{pinned}
