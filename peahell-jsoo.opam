@@ -4,7 +4,7 @@ maintainer: "Gabriel Radanne <drupyog@zoho.com>"
 authors: "Gabriel Radanne <drupyog@zoho.com>"
 homepage: "https://github.com/Drup/peahell"
 bug-reports: "https://github.com/Drup/peahell/issues"
-license: "ISC"
+license: "MIT"
 dev-repo: "git+https://github.com/Drup/peahell.git"
 
 build: [
