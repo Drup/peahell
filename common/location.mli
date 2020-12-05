@@ -1,3 +1,5 @@
+(** Locations in inputs *)
+
 (** Source code locations. *)
 type loc = 
   | File of string

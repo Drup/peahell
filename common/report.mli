@@ -1,3 +1,5 @@
+(** Error and information reporting *)
+
 val printf :
   ?loc:Location.loc ->
   ?sub:Location.loc list ->

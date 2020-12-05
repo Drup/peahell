@@ -1,3 +1,5 @@
+(** Lexing and Parsing *)
+
 module Lex : sig
   type error = ..
   exception Error of error * Location.loc

@@ -1,21 +1,3 @@
-let print_parens ?(max_level=9999) ?(at_level=0) ppf =
-  if max_level < at_level then
-    begin
-      Format.fprintf ppf "(@[" ;
-      Format.kfprintf (fun ppf -> Format.fprintf ppf "@])") ppf
-    end
-  else
-    begin
-      Format.fprintf ppf "@[" ;
-      Format.kfprintf (fun ppf -> Format.fprintf ppf "@]") ppf
-    end
-
-module Location = Location
-module Report = Report
-module Input = Input
-
-type filename = Language.filename
-
 (** The definition of a programming language *)
 module type Language = Language.S
 
@@ -25,6 +7,10 @@ module Make (L : Language) = struct
   (** Main program *)
   let main () = R.main ()
 end
+
+module Location = Location
+module Report = Report
+module Input = Input
 
 (* 
 MIT License
