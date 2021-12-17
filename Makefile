@@ -1,6 +1,8 @@
 NAME=peahell
 DOCDIR=.gh-pages
 
+.PHONY: all test clean doc gh-pages
+
 all:
 	dune build @install
 
