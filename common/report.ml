@@ -98,21 +98,16 @@ let () = Printexc.record_backtrace true
 let errorf ?(loc = Nowhere) ?(sub = []) =
   Format.kdprintf (fun data -> { kind = Error; main = { loc; data } ; sub})
 
-let warnf ?(loc = Nowhere) ?(sub = []) w =
+let outf ?(loc = Nowhere) ?(sub = []) ppf kind =
   Format.kdprintf (fun data ->
-      pp_report Fmt.stdout { kind = Warning w ; main = { loc; data } ; sub})
+      pp_report ppf { kind; main = { loc; data } ; sub})
 
-let infof ?(loc = Nowhere) ?(sub = []) i =
-  Format.kdprintf (fun data ->
-      pp_report Fmt.stdout { kind = Info i ; main = { loc; data } ; sub})
+let warnf ?loc ?sub w = outf ?loc ?sub Fmt.stdout (Warning w)
+let infof ?loc ?sub i = outf ?loc ?sub Fmt.stdout (Info i)
 
-let printf ?(loc = Nowhere) ?(sub = []) =
-  Format.kdprintf (fun data ->
-      pp_report Fmt.stdout { kind = Output ; main = { loc; data } ; sub})
-
-let fprintf ?(loc = Nowhere) ?(sub = []) ppf =
-  Format.kdprintf (fun data ->
-      pp_report ppf { kind = Output ; main = { loc; data } ; sub})
+let fprintf ?loc ?sub ppf = outf ?loc ?sub ppf Output
+let printf ?loc ?sub = fprintf ?loc ?sub Fmt.stdout
+let eprintf ?loc ?sub = fprintf ?loc ?sub Fmt.stderr
 
 (** A builtin error, for convenience *)
 

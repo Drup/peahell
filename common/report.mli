@@ -5,6 +5,11 @@ val printf :
   ?sub:Location.loc list ->
   ('a, Format.formatter, unit, unit) format4 -> 'a
 
+val eprintf :
+  ?loc:Location.loc ->
+  ?sub:Location.loc list ->
+  ('a, Format.formatter, unit, unit) format4 -> 'a
+
 val fprintf :
   ?loc:Location.loc ->
   ?sub:Location.loc list ->
