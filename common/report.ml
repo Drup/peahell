@@ -97,7 +97,9 @@ let report_exception ppf exn =
   let rec loop n exn =
     match report_of_exn exn with
     | None -> reraise exn
-    | Some r -> pp_report ppf r; Printexc.print_backtrace stdout
+    | Some r ->
+      pp_report ppf r;
+      if !level = Debug then Printexc.print_backtrace stdout
     | exception exn when n > 0 -> loop (n-1) exn
   in
   loop 5 exn
