@@ -2,5 +2,5 @@
  (name peahell_native)
  (public_name peahell.native)
  (implements peahell)
- (libraries unix linenoise)
+ (libraries unix linenoise trace-tef)
 )

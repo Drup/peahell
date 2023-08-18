@@ -1,16 +1,23 @@
 open Location
 
-type msg = (Format.formatter -> unit) t
+type level =
+  | Quiet
+  | Normal
+  | Debug
+let level = ref Normal
+
+type msg = Format.formatter -> unit
 
 type report_kind =
   | Error
   | Warning of string
   | Info of string
-  | Output
+  | Debug
 
 type report = {
   kind : report_kind;
-  main : msg;
+  loc : Location.loc;
+  msg : msg;
   sub : Location.loc list;
 }
 
@@ -24,32 +31,36 @@ type report_printer = {
     Format.formatter -> loc -> unit;
   pp_main_txt : report_printer -> report ->
     Format.formatter -> (Format.formatter -> unit) -> unit;
+  out : Format.formatter ;
+  err : Format.formatter ;
 }
 
 let batch_mode_printer : report_printer =
+  let out = Format.std_formatter in
+  let err = Format.err_formatter in
   let pp_loc _self _report ppf loc =
     Format.fprintf ppf "@[<v>%a:@]" Location.pp loc
   in
   let pp_txt ppf txt = Format.fprintf ppf "@[%t@]" txt in
-  let pp self ppf ({ kind; main; sub } as report) =
-    match main.loc with
+  let pp self ppf ({ kind; msg ; loc ; sub } as report) =
+    match loc with
     | Location.Nowhere ->
       Format.fprintf ppf "@[<v>%a%a@,%a@]"
         (self.pp_report_kind self report) kind
-        (self.pp_main_txt self report) main.data
+        (self.pp_main_txt self report) msg
         (Fmt.list ~sep:Fmt.cut @@ self.pp_main_loc self report) sub
     | loc ->
       Format.fprintf ppf "@[<v>%a@ %a%a@,%a@]"
         (self.pp_main_loc self report) loc
         (self.pp_report_kind self report) kind
-        (self.pp_main_txt self report) main.data
+        (self.pp_main_txt self report) msg
         (Fmt.list ~sep:Fmt.cut @@ self.pp_main_loc self report) sub
   in
   let pp_report_kind _self _ ppf = function
     | Error -> Format.fprintf ppf "@{<error>Error@}: "
     | Warning w -> Format.fprintf ppf "@{<warning>Warning@} %s: " w
     | Info w -> Format.fprintf ppf "@{<info>Info@} %s: " w
-    | Output -> ()
+    | Debug -> ()
   in
   let pp_main_loc self report ppf loc =
     pp_loc self report ppf loc
@@ -57,7 +68,7 @@ let batch_mode_printer : report_printer =
   let pp_main_txt _self _ ppf txt =
     pp_txt ppf txt
   in
-  { pp; pp_report_kind; pp_main_loc; pp_main_txt }
+  { pp; pp_report_kind; pp_main_loc; pp_main_txt ; out ; err }
 
 let report_printer = ref batch_mode_printer
 
@@ -86,7 +97,7 @@ let report_exception ppf exn =
   let rec loop n exn =
     match report_of_exn exn with
     | None -> reraise exn
-    | Some r -> pp_report ppf r
+    | Some r -> pp_report ppf r; Printexc.print_backtrace stdout
     | exception exn when n > 0 -> loop (n-1) exn
   in
   loop 5 exn
@@ -96,18 +107,34 @@ let () = Printexc.record_backtrace true
 (** Smart constructors *)
 
 let errorf ?(loc = Nowhere) ?(sub = []) =
-  Format.kdprintf (fun data -> { kind = Error; main = { loc; data } ; sub})
+  Format.kdprintf (fun msg -> { kind = Error; loc; msg ; sub})
 
-let outf ?(loc = Nowhere) ?(sub = []) ppf kind =
-  Format.kdprintf (fun data ->
-      pp_report ppf { kind; main = { loc; data } ; sub})
+let outf ?(loc = Nowhere) ?(sub = []) ?span kind =
+  Format.kdprintf (fun msg ->
+      if !level = Quiet then () else
+        pp_report !report_printer.out { kind; loc; msg; sub};
+      Trace.messagef ?span
+        (fun k -> k "%a"
+            pp_report { kind; loc; msg; sub})
+    )
 
-let warnf ?loc ?sub w = outf ?loc ?sub Fmt.stdout (Warning w)
-let infof ?loc ?sub i = outf ?loc ?sub Fmt.stdout (Info i)
+let warnf ?loc ?sub ?span w = outf ?loc ?sub ?span (Warning w)
+let infof ?loc ?sub ?span i = outf ?loc ?sub ?span (Info i)
 
-let fprintf ?loc ?sub ppf = outf ?loc ?sub ppf Output
-let printf ?loc ?sub = fprintf ?loc ?sub Fmt.stdout
-let eprintf ?loc ?sub = fprintf ?loc ?sub Fmt.stderr
+let debugf ?(loc = Nowhere) ?(sub = []) ?span = 
+  Format.kdprintf (fun msg ->
+      Trace.messagef ?span
+        (fun k -> k "%a"
+            pp_report { kind = Debug; loc; msg; sub})
+    )
+
+let enter ?__FUNCTION__ ~__FILE__ ~__LINE__ ?(args=[]) s f =
+  let data () =
+    List.map (fun (s, t) -> s, `String (Format.asprintf "%t@." t)) args
+  in
+  Trace.with_span ?__FUNCTION__ ~__FILE__ ~__LINE__ ~data s f
+let d pp x = Format.dprintf "%a" pp x
+let (let@@) = (@@)
 
 (** A builtin error, for convenience *)
 

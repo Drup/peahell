@@ -1,42 +1,55 @@
 (** Error and information reporting *)
 
-val printf :
-  ?loc:Location.loc ->
-  ?sub:Location.loc list ->
-  ('a, Format.formatter, unit, unit) format4 -> 'a
-
-val eprintf :
-  ?loc:Location.loc ->
-  ?sub:Location.loc list ->
-  ('a, Format.formatter, unit, unit) format4 -> 'a
-
-val fprintf :
-  ?loc:Location.loc ->
-  ?sub:Location.loc list ->
-  Format.formatter ->
-  ('a, Format.formatter, unit, unit) format4 -> 'a
-
 val infof :
   ?loc:Location.loc ->
   ?sub:Location.loc list ->
+  ?span:Trace.span ->
   string -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
 val warnf :
   ?loc:Location.loc ->
   ?sub:Location.loc list ->
+  ?span:Trace.span ->
   string -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
-type msg = (Format.formatter -> unit) Location.t
+val debugf :
+  ?loc:Location.loc ->
+  ?sub:Location.loc list ->
+  ?span:Trace.span ->
+  ('a, Format.formatter, unit, unit) format4 -> 'a
+
+val enter : 
+  ?__FUNCTION__:string ->
+  __FILE__:string ->
+  __LINE__:int ->
+  ?args:(string * (Format.formatter -> unit)) list ->
+  string -> (Trace.span -> 'a) -> 'a
+
+val (let@@) : ('a -> 'b) -> 'a -> 'b
+val d : (Format.formatter -> 'a -> unit) -> 'a -> Format.formatter -> unit
+
+(** [fail ~loc "msg"] raises a built-in generic failure, for convenience. *)
+val fail :
+  ?loc:Location.loc ->
+  ('a, Format.formatter, unit, 'b) format4 -> 'a
+
+(** Levels *)
+
+type level = Quiet | Normal | Debug
+val level : level ref
+
+type msg = Format.formatter -> unit
 
 type report_kind =
   | Error
   | Warning of string
   | Info of string
-  | Output
+  | Debug
 
 type report = {
   kind : report_kind;
-  main : msg;
+  loc : Location.loc;
+  msg : msg;
   sub : Location.loc list;
 }
 
@@ -49,7 +62,3 @@ val register_report_of_exn : (exn -> report option) -> unit
 
 val report_exception : Format.formatter -> exn -> unit
 
-(** [fail ~loc "msg"] raises a built-in generic failure, for convenience. *)
-val fail :
-  ?loc:Location.loc ->
-  ('a, Format.formatter, unit, 'b) format4 -> 'a

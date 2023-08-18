@@ -16,6 +16,10 @@ module Make (L : Language.S) = struct
   type mode = Batch | Interactive | Expect
   let mode = ref Interactive
 
+  (** Trace printing *)
+  type trace_out = Stdout | File of string
+  let trace_out = ref (File "trace.json")
+
   (** The usage message. *)
   let usage =
     match L.file_parser with
@@ -46,7 +50,18 @@ module Make (L : Language.S) = struct
        " Mode for running");
       ("-l",
        Arg.String (fun str -> add_file str),
-       "<file> Load <file> into the initial environment")
+       "<file> Load <file> into the initial environment");
+      ("-q",
+       Arg.Unit (fun () -> Report.level := Quiet),
+       "Do not output anything");
+      ("-debug",
+       Arg.Unit (fun () -> Report.level := Debug),
+       "Enable trace debuging");
+      ("-trace",
+       Arg.String (function
+           | "stdout" -> trace_out := Stdout
+           | s -> trace_out := File s),
+       "Where to emit debug trace. Can be 'stdout' (for tracing to the stdout), or a filename. Default is 'trace.json'")
     ] @
       L.options)
 
@@ -158,6 +173,21 @@ module Make (L : Language.S) = struct
       done
     with End_of_file -> ()
 
+  let run f =
+    begin match !Report.level, !trace_out with
+      | Debug, Stdout -> Trace_tef.setup ~out:`Stdout ()
+      | Debug, File s -> Trace_tef.setup ~out:(`File s) ()
+      | _ -> ()
+    end;
+    try
+      f ();
+      Trace.shutdown ();
+      exit 0
+    with err ->
+      Format.eprintf "%a@." Report.report_exception err;
+      Trace.shutdown ();
+      exit 1 
+  
   (** Main program *)
   let main () =
     LNoise.set_multiline true;
@@ -173,10 +203,10 @@ module Make (L : Language.S) = struct
     Format.set_ellipsis_text "..." ;
     Format.set_margin 80 ;
     Format.set_max_indent 30 ;
-    try
-      (* Run and load all the specified files. *)
+    (* Run and load all the specified files. *)
+    run begin fun () ->
       match !mode with
-      | Batch -> 
+      | Batch ->
         let _ = batch L.initial_environment !files in
         ()
       | Interactive -> 
@@ -188,7 +218,5 @@ module Make (L : Language.S) = struct
           | _ -> Report.fail "Expect mode only accept one file"
         in
         expect L.initial_environment file
-    with err ->
-      Format.eprintf "%a@." Report.report_exception err;
-      exit 1
+    end 
 end

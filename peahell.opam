@@ -20,4 +20,6 @@ depends: [
   "dune" {build & >= "1.0"}
   "fmt"
   "linenoise"
+  "trace"
+  "trace-tef"
 ]
