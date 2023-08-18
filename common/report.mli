@@ -62,3 +62,23 @@ val register_report_of_exn : (exn -> report option) -> unit
 
 val report_exception : Format.formatter -> exn -> unit
 
+(** Report printer *)
+
+type report_printer = {
+  pp : report_printer -> Format.formatter -> report -> unit;
+  pp_report_kind :
+    report_printer ->
+    report -> Format.formatter -> report_kind -> unit;
+  pp_main_loc :
+    report_printer ->
+    report -> Format.formatter -> Location.loc -> unit;
+  pp_main_txt :
+    report_printer ->
+    report ->
+    Format.formatter -> (Format.formatter -> unit) -> unit;
+  out : Format.formatter;
+  err : Format.formatter;
+}
+
+val report_printer : report_printer ref
+val batch_mode_printer : report_printer

@@ -107,7 +107,7 @@ module Make (L : Language.S) = struct
     match L.file_parser with
     | Some f ->
       let cmds = read_file f filename in
-      L.exec Format.std_formatter use_file ctx cmds
+      L.exec use_file ctx cmds
     | None ->
       Report.fail "Cannot load files, only interactive shell is available"
 
@@ -127,18 +127,14 @@ module Make (L : Language.S) = struct
           let txt = really_input_string ic (index1 - prev_index) in
           print_endline txt;
           print_endline open_string;
-          let ctx, s =
-            let b = Buffer.create 7 in
-            let ppf = Format.formatter_of_buffer b in
-            let ctx =
-              try L.exec ppf use_file ctx input
-              with err ->
-                Format.fprintf ppf "%a@." Report.report_exception err;
-                ctx
-            in
-            ctx, String.trim (Buffer.contents b)
+          let ctx =
+            try L.exec use_file ctx input
+            with err ->
+              Format.printf "%a" Report.report_exception err;
+              ctx
           in
-          print_endline s;
+          Format.print_flush ();
+          print_newline ();
           print_string end_string;
           walk_sections index2 ctx t
       in
@@ -166,7 +162,7 @@ module Make (L : Language.S) = struct
       while true do
         try
           let cmd = read_toplevel (Input.wrap toplevel_parser) () in
-          ctx := L.exec Format.std_formatter use_file !ctx cmd
+          ctx := L.exec use_file !ctx cmd
         with
         | Sys.Break -> prerr_endline "Interrupted."
         | err -> Format.eprintf "%a@." Report.report_exception err

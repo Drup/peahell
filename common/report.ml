@@ -39,27 +39,27 @@ let batch_mode_printer : report_printer =
   let out = Format.std_formatter in
   let err = Format.err_formatter in
   let pp_loc _self _report ppf loc =
-    Format.fprintf ppf "@[<v>%a:@]" Location.pp loc
+    Format.fprintf ppf "@[%a:@]" Location.pp loc
   in
   let pp_txt ppf txt = Format.fprintf ppf "@[%t@]" txt in
   let pp self ppf ({ kind; msg ; loc ; sub } as report) =
     match loc with
     | Location.Nowhere ->
-      Format.fprintf ppf "@[<v>%a%a@,%a@]"
+      Format.fprintf ppf "@[<2>%a%a@,%a@]@."
         (self.pp_report_kind self report) kind
         (self.pp_main_txt self report) msg
         (Fmt.list ~sep:Fmt.cut @@ self.pp_main_loc self report) sub
     | loc ->
-      Format.fprintf ppf "@[<v>%a@ %a%a@,%a@]"
+      Format.fprintf ppf "@[<2>%a@ %a%a@,%a@]@."
         (self.pp_main_loc self report) loc
         (self.pp_report_kind self report) kind
         (self.pp_main_txt self report) msg
         (Fmt.list ~sep:Fmt.cut @@ self.pp_main_loc self report) sub
   in
   let pp_report_kind _self _ ppf = function
-    | Error -> Format.fprintf ppf "@{<error>Error@}: "
-    | Warning w -> Format.fprintf ppf "@{<warning>Warning@} %s: " w
-    | Info w -> Format.fprintf ppf "@{<info>Info@} %s: " w
+    | Error -> Format.fprintf ppf "@{<error>[Error]@}:@ "
+    | Warning w -> Format.fprintf ppf "@{<warning>[Warning@} %s]:@ " w
+    | Info w -> Format.fprintf ppf "@{<info>[Info@} %s]:@ " w
     | Debug -> ()
   in
   let pp_main_loc self report ppf loc =
@@ -130,7 +130,7 @@ let debugf ?(loc = Nowhere) ?(sub = []) ?span =
 
 let enter ?__FUNCTION__ ~__FILE__ ~__LINE__ ?(args=[]) s f =
   let data () =
-    List.map (fun (s, t) -> s, `String (Format.asprintf "%t@." t)) args
+    List.map (fun (s, t) -> s, `String (Format.asprintf "%t" t)) args
   in
   Trace.with_span ?__FUNCTION__ ~__FILE__ ~__LINE__ ~data s f
 let d pp x = Format.dprintf "%a" pp x
@@ -138,14 +138,14 @@ let (let@@) = (@@)
 
 (** A builtin error, for convenience *)
 
-exception Fail of (loc * string)
+exception Fail of (loc * msg)
 let () = register_report_of_exn @@ function
   | Fail (loc, msg) ->
-    Some (errorf ~loc "Error: %s@." msg)
+    Some (errorf ~loc "@[%t@]@." msg)
   | _ -> None
 let fail ?(loc=Nowhere) = 
-  let k _ = raise @@ Fail (loc, Format.flush_str_formatter ()) in
-  Format.kfprintf k Format.str_formatter
+  let k msg = raise @@ Fail (loc, msg) in
+  Format.kdprintf k
 
 (** Generic errors *)
 

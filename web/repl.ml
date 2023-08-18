@@ -51,7 +51,6 @@ module Make (L : Language.S) = struct
     | Some f ->
       let cmds = read_file f (filename, content) in
       L.exec
-        Format.std_formatter
         (fun _ _ -> Report.fail "Cannot load files in the web toplevel")
         ctx cmds
     | None ->
