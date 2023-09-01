@@ -1,7 +1,6 @@
 (library
  (name peahell)
  (public_name peahell)
- (virtual_modules repl)
  (modules_without_implementation language)
  (libraries fmt trace)
 )

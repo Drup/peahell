@@ -1,3 +1,4 @@
+open Peahell
 
 module DomRepl = struct
   open Js_of_ocaml
@@ -36,7 +37,7 @@ module DomRepl = struct
     t
 end
 
-module Make (L : Language.S) = struct
+module Make (L : Language) = struct
 
   (** Parse the contents from a file, using a given [parser]. *)
   let read_file parser (fn, str) =
@@ -68,7 +69,7 @@ module Make (L : Language.S) = struct
     end ;
     ()
 
-  let _load_files l =
+  let load_files l =
     let open Js_of_ocaml_tyxml.Tyxml_js in
     let elem s =
       Html.(li [a ~a:[a_class ["file"]; a_href ("#"^s); a_title s;

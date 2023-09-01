@@ -1,13 +1,6 @@
 (** The definition of a programming language *)
 module type Language = Language.S
 
-module Make (L : Language) = struct
-  module R = Repl.Make(L)
-
-  (** Main program *)
-  let main () = R.main ()
-end
-
 module Location = Location
 module Report = Report
 module Input = Input

@@ -1,4 +1,6 @@
-module Make (L : Language.S) = struct
+open Peahell
+
+module Make (L : Language) = struct
 
   module History = struct
     let filename = Sys.getenv "HOME" ^ "/." ^ L.name ^ ".history"

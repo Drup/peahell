@@ -3,12 +3,6 @@
 (** The definition of a programming language *)
 module type Language = Language.S
 
-(** Create a language from its definition. *)
-module Make (L : Language) : sig
-  (** The main program *)
-  val main : unit -> unit
-end
-
 module Location = Location
 module Report = Report
 module Input = Input
