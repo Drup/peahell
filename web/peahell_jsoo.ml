@@ -58,6 +58,13 @@ module Make (L : Language) = struct
       Report.fail "Cannot load files, only interactive shell is available"
 
 
+  let () =
+    Report.report_printer :=
+      {Report.batch_mode_printer with
+       out = DomRepl.term;
+       err = DomRepl.term;
+      }
+
   let eval (name, s) =
     let name = Js_of_ocaml.Js.to_string name in
     let s = Js_of_ocaml.Js.to_string s in
@@ -69,7 +76,7 @@ module Make (L : Language) = struct
     end ;
     ()
 
-  let load_files l =
+  let register_examples l =
     let open Js_of_ocaml_tyxml.Tyxml_js in
     let elem s =
       Html.(li [a ~a:[a_class ["file"]; a_href ("#"^s); a_title s;
@@ -79,10 +86,15 @@ module Make (L : Language) = struct
     let l = Html.ul (List.map elem l) in
     Register.id ~keep:true "examples" [l]
   
-  let main () =
+  let main ~(default: string) ~(files : string list) () =
+    register_examples files;
     DomRepl.set_lang_name L.name;
     Js_of_ocaml.Js.export "REPL" (object%js
       method eval name s = eval (name, s)
+      val default = Js_of_ocaml.Js.string default
+      val examples =
+        Js_of_ocaml.Js.array @@ Array.of_list @@
+        List.map Js_of_ocaml.Js.string files
     end)
     
 end
