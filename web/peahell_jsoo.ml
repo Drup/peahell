@@ -37,6 +37,13 @@ module DomRepl = struct
     t
 end
 
+let () =
+  Report.report_printer :=
+    {Report.batch_mode_printer with
+     out = DomRepl.term;
+     err = DomRepl.term;
+    }
+
 module Make (L : Language) = struct
 
   (** Parse the contents from a file, using a given [parser]. *)
@@ -56,15 +63,7 @@ module Make (L : Language) = struct
         ctx cmds
     | None ->
       Report.fail "Cannot load files, only interactive shell is available"
-
-
-  let () =
-    Report.report_printer :=
-      {Report.batch_mode_printer with
-       out = DomRepl.term;
-       err = DomRepl.term;
-      }
-
+  
   let eval (name, s) =
     let name = Js_of_ocaml.Js.to_string name in
     let s = Js_of_ocaml.Js.to_string s in

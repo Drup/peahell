@@ -6,6 +6,7 @@ module type Language = Language.S
 module Location = Location
 module Report = Report
 module Input = Input
+module File = File
 
 (*
 
