@@ -45,12 +45,12 @@ let batch_mode_printer : report_printer =
   let pp self ppf ({ kind; msg ; loc ; sub } as report) =
     match loc with
     | Location.Nowhere ->
-      Format.fprintf ppf "@[<2>%a%a@,%a@]@."
+      Format.fprintf ppf "@[<v>%a%a@,%a@]@."
         (self.pp_report_kind self report) kind
         (self.pp_main_txt self report) msg
         (Fmt.list ~sep:Fmt.cut @@ self.pp_main_loc self report) sub
     | loc ->
-      Format.fprintf ppf "@[<2>%a@ %a%a@,%a@]@."
+      Format.fprintf ppf "@[<v>%a@ %a%a@,%a@]@."
         (self.pp_main_loc self report) loc
         (self.pp_report_kind self report) kind
         (self.pp_main_txt self report) msg
@@ -59,7 +59,7 @@ let batch_mode_printer : report_printer =
   let pp_report_kind _self _ ppf = function
     | Error -> Format.fprintf ppf "@{<error>[Error]@}:@ "
     | Warning w -> Format.fprintf ppf "@{<warning>[Warning@} %s]:@ " w
-    | Info w -> Format.fprintf ppf "@{<info>[Info@} %s]:@ " w
+    | Info w -> Format.fprintf ppf "@{<info>[%s]@}:@ " w
     | Debug -> ()
   in
   let pp_main_loc self report ppf loc =
