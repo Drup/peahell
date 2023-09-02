@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"><head><title>File (peahell.Peahell.File)</title><link rel="stylesheet" href="../../../odoc.support/odoc.css"/><meta charset="utf-8"/><meta name="generator" content="odoc 2.2.1"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><script src="../../../odoc.support/highlight.pack.js"></script><script>hljs.initHighlightingOnLoad();</script></head><body class="odoc"><nav class="odoc-nav"><a href="../index.html">Up</a> – <a href="../../index.html">peahell</a> &#x00BB; <a href="../index.html">Peahell</a> &#x00BB; File</nav><header class="odoc-preamble"><h1>Module <code><span>Peahell.File</span></code></h1></header><div class="odoc-content"><div class="odoc-spec"><div class="spec value anchored" id="val-outfile_path"><a href="#val-outfile_path" class="anchor"></a><code><span><span class="keyword">val</span> outfile_path : <span>string <span class="xref-unresolved">Stdlib</span>.ref</span></span></code></div></div><div class="odoc-spec"><div class="spec type anchored" id="type-file_emitter"><a href="#type-file_emitter" class="anchor"></a><code><span><span class="keyword">type</span> file_emitter</span><span> =
+  <span>filename:string <span class="arrow">&#45;&gt;</span></span>
+  <span>title:string <span class="arrow">&#45;&gt;</span></span>
+  <span>mime:<span>string option</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span><span class="xref-unresolved">Stdlib</span>.Format.formatter <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  unit</span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-native_file_emitter"><a href="#val-native_file_emitter" class="anchor"></a><code><span><span class="keyword">val</span> native_file_emitter : 
+  <span>filename:string <span class="arrow">&#45;&gt;</span></span>
+  <span>title:<span class="type-var">'a</span> <span class="arrow">&#45;&gt;</span></span>
+  <span>mime:<span class="type-var">'b</span> <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(<span><span class="xref-unresolved">Stdlib</span>.Format.formatter <span class="arrow">&#45;&gt;</span></span> unit)</span> <span class="arrow">&#45;&gt;</span></span>
+  unit</span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-file_emitter"><a href="#val-file_emitter" class="anchor"></a><code><span><span class="keyword">val</span> file_emitter : <span><a href="#type-file_emitter">file_emitter</a> <span class="xref-unresolved">Stdlib</span>.ref</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-emitf"><a href="#val-emitf" class="anchor"></a><code><span><span class="keyword">val</span> emitf : 
+  <span>?mime:string <span class="arrow">&#45;&gt;</span></span>
+  <span>title:string <span class="arrow">&#45;&gt;</span></span>
+  <span>filename:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span class="type-var">'a</span>, <span class="xref-unresolved">Stdlib</span>.Format.formatter, unit, unit)</span> <span class="xref-unresolved">Stdlib</span>.format4</span> <span class="arrow">&#45;&gt;</span></span>
+  <span class="type-var">'a</span></span></code></div></div><div class="odoc-spec"><div class="spec value anchored" id="val-debugf"><a href="#val-debugf" class="anchor"></a><code><span><span class="keyword">val</span> debugf : 
+  <span>?mime:string <span class="arrow">&#45;&gt;</span></span>
+  <span>title:string <span class="arrow">&#45;&gt;</span></span>
+  <span>filename:string <span class="arrow">&#45;&gt;</span></span>
+  <span><span><span>(<span class="type-var">'a</span>, <span class="xref-unresolved">Stdlib</span>.Format.formatter, unit, unit)</span> <span class="xref-unresolved">Stdlib</span>.format4</span> <span class="arrow">&#45;&gt;</span></span>
+  <span class="type-var">'a</span></span></code></div></div><div class="odoc-spec"><div class="spec class anchored" id="class-logger"><a href="#class-logger" class="anchor"></a><code><span><span class="keyword">class</span> +'b </span><span><a href="class-logger/index.html">logger</a></span><span> : <span>?mime:<span>string option</span> <span class="arrow">&#45;&gt;</span></span> <span><span>(<span><span class="xref-unresolved">Stdlib</span>.Format.formatter <span class="arrow">&#45;&gt;</span></span>
+  <span><span>(string * <span class="type-var">'t</span>)</span> <span class="arrow">&#45;&gt;</span></span>
+  unit)</span> <span class="arrow">&#45;&gt;</span></span> <span class="keyword">object</span> ... <span class="keyword">end</span></span></code></div></div></div></body></html>
