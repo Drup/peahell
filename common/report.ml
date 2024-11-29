@@ -125,6 +125,9 @@ let infof ?loc ?sub ?span i = outf ?loc ?sub ?span (Info i)
 
 let debugf ?(loc = Nowhere) ?(sub = []) ?span = 
   Format.kdprintf (fun msg ->
+      begin if !level = Debug then
+          pp_report !report_printer.out { kind=Debug; loc; msg; sub}
+      end;
       Trace.messagef ?span
         (fun k -> k "%a"
             pp_report { kind = Debug; loc; msg; sub})
