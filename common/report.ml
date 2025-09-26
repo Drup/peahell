@@ -133,11 +133,20 @@ let debugf ?(loc = Nowhere) ?(sub = []) ?span =
             pp_report { kind = Debug; loc; msg; sub})
     )
 
-let enter ?__FUNCTION__ ~__FILE__ ~__LINE__ ?(args=[]) s f =
+let enter ?__FUNCTION__ ~__FILE__ ~__LINE__ ?(args=[]) ?res s f =
   let data () =
     List.map (fun (s, t) -> s, `String (Format.asprintf "%t" t)) args
   in
-  Trace.with_span ?__FUNCTION__ ~__FILE__ ~__LINE__ ~data s f
+  let sp = Trace.enter_span ?__FUNCTION__ ~__FILE__ ~__LINE__ ~data s in
+  let ret = f () in
+  begin match res with
+  | Some pp -> 
+    Trace.add_data_to_span sp
+      ["return", `String (Format.asprintf "%a" pp ret)]
+  | None -> ()
+  end;
+  Trace.exit_span sp;
+  ret
 let d pp x = Format.dprintf "%a" pp x
 let (let@@) = (@@)
 

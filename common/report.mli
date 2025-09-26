@@ -23,7 +23,8 @@ val enter :
   __FILE__:string ->
   __LINE__:int ->
   ?args:(string * (Format.formatter -> unit)) list ->
-  string -> (Trace.span -> 'a) -> 'a
+  ?res:(Format.formatter -> 'a -> unit) ->
+  string -> (unit -> 'a) -> 'a
 
 val (let@@) : ('a -> 'b) -> 'a -> 'b
 val d : (Format.formatter -> 'a -> unit) -> 'a -> Format.formatter -> unit
