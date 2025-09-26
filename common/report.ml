@@ -138,15 +138,20 @@ let enter ?__FUNCTION__ ~__FILE__ ~__LINE__ ?(args=[]) ?res s f =
     List.map (fun (s, t) -> s, `String (Format.asprintf "%t" t)) args
   in
   let sp = Trace.enter_span ?__FUNCTION__ ~__FILE__ ~__LINE__ ~data s in
-  let ret = f () in
-  begin match res with
-  | Some pp -> 
+  match f () with
+  | exception exn ->
     Trace.add_data_to_span sp
-      ["return", `String (Format.asprintf "%a" pp ret)]
-  | None -> ()
-  end;
-  Trace.exit_span sp;
-  ret
+      ["error", `String (Printexc.to_string exn)];
+    Trace.exit_span sp;      
+    reraise exn
+  | ret ->
+    Option.iter (fun pp -> 
+        Trace.add_data_to_span sp
+          ["return", `String (Format.asprintf "%a" pp ret)]
+      ) res;
+    Trace.exit_span sp;
+    ret
+
 let d pp x = Format.dprintf "%a" pp x
 let (let@@) = (@@)
 
