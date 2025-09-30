@@ -19,8 +19,8 @@ module Make (L : Language) = struct
   let mode = ref Interactive
 
   (** Trace printing *)
-  type trace_out = Stdout | File of string
-  let trace_out = ref (File "trace.json")
+  type trace_out = File of string
+  let trace_out = ref (File "trace.fxt")
 
   (** The usage message. *)
   let usage =
@@ -61,7 +61,6 @@ module Make (L : Language) = struct
        "Enable trace debuging");
       ("-trace",
        Arg.String (function
-           | "stdout" -> trace_out := Stdout
            | s -> trace_out := File s),
        "Where to emit debug trace. Can be 'stdout' (for tracing to the stdout), or a filename. Default is 'trace.json'")
     ] @
@@ -173,8 +172,7 @@ module Make (L : Language) = struct
 
   let run f =
     begin match !Report.level, !trace_out with
-      | Debug, Stdout -> Trace_tef.setup ~out:`Stdout ()
-      | Debug, File s -> Trace_tef.setup ~out:(`File s) ()
+      | Debug, File s -> Trace_fuchsia.setup ~out:(`File s) ()
       | _ -> ()
     end;
     try

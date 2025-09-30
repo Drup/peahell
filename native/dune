@@ -1,5 +1,5 @@
 (library
  (name peahell_native)
  (public_name peahell.native)
- (libraries unix peahell linenoise trace-tef)
+ (libraries unix peahell linenoise trace-fuchsia)
 )
