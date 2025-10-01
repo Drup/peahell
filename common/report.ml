@@ -139,6 +139,11 @@ let enter ?__FUNCTION__ ~__FILE__ ~__LINE__ ?(args=[]) ?res s f =
   in
   let sp = Trace.enter_span ?__FUNCTION__ ~__FILE__ ~__LINE__ ~data s in
   match f () with
+  | exception (Sys.Break as exn) ->
+    Trace.add_data_to_span sp
+      ["interupted", `None];
+    Trace.exit_span sp;      
+    reraise exn
   | exception exn ->
     Trace.add_data_to_span sp
       ["error", `String (Printexc.to_string exn)];
