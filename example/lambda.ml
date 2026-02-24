@@ -16,16 +16,17 @@ type context =
   | CAdd of context_list
   | CSet of context
 and context_list = v list * context * expr list
+[@@deriving show { with_path = false }]
 
 let v x = Value x
 
-let rec plug c e0 = match c with
+let rec plug ~outter:c ~inner:e0 = match c with
   | CHole -> e0
-  | CAppL (c, e) -> App (plug c e0, e)
-  | CAppR (x, c) -> App (v x, plug c e0)
+  | CAppL (c, e) -> CAppL (plug ~outter:c ~inner:e0, e)
+  | CAppR (x, c) -> CAppR (x, plug ~outter:c ~inner:e0)
   | CAdd (pre, c, post) ->
-    Add (List.map v pre @ plug c e0 :: post)
-  | CSet c -> Set (plug c e0)
+    CAdd (pre, plug ~outter:c ~inner:e0, post)
+  | CSet c -> CSet (plug ~outter:c ~inner:e0)
 
 let map_context f l =
   let rec aux f acc = function
@@ -38,10 +39,11 @@ let map_context f l =
   aux f [] l
 
 module E = Expr(struct
-    type nonrec t = expr
+    type nonrec expr = expr
     type nonrec context = context
     let plug = plug
-    let pp = pp_expr
+    let pp_expr = pp_expr
+    let pp_context = pp_context
   end)
 open E.Infix
 
@@ -66,23 +68,24 @@ let sum vs =
 
 let rec eval e0 =
   let eval = Interp.recurse eval in
+  let ctx = E.ctx e0 in
   match E.view e0 with
   | Value v -> v
   | App (f, arg) ->
-    let f' = eval (e0 $>> CAppL (CHole, arg) ^> f) in
-    let arg' = eval (e0 $>> CAppR (f', CHole) ^> arg) in
+    let f' = eval (ctx ^>> CAppL (CHole, arg) ^> f) in
+    let arg' = eval (ctx ^>> CAppR (f', CHole) ^> arg) in
     begin match f' with
-      | Lam l -> eval (e0 $> l (v arg'))
+      | Lam l -> eval (ctx ^> l (v arg'))
       | _ -> failwith "foo"
     end
   | Add l ->
     let vs =
-      map_context (fun ctxs_i e_i -> eval (e0 $>> CAdd ctxs_i ^> e_i)) l
+      map_context (fun ctxs_i e_i -> eval (ctx ^>> CAdd ctxs_i ^> e_i)) l
     in
     sum vs
   | Get -> Interp.get ()
   | Set e ->
-    let v = eval (e0 $>> CSet CHole ^> e) in
+    let v = eval (ctx ^>> CSet CHole ^> e) in
     Interp.set v;
     v
     

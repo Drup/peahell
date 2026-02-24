@@ -1,31 +1,31 @@
 module Expr (E : sig
-    type t
+    type expr
     type context
-    val plug : context -> t -> t
-    val pp : Format.formatter -> t -> unit
+    val plug : outter:context -> inner:context -> context
+    val pp_expr : Format.formatter -> expr -> unit
+    val pp_context : Format.formatter -> context -> unit
   end) = struct
   open E
   
-  type t = { ctxs: E.context list ; view : E.t }
+  type t = { ctx: E.context ; view : E.expr }
 
+  let mk ctx view = { ctx; view }
+  
+  let inside outter { ctx; view }=
+    let ctx = E.plug ~outter ~inner:ctx in
+    { ctx; view }
+  
   module Infix = struct
-    let (^>) ctx view = { ctxs = [ctx] ; view }
-    let (^>>) ctx e = { ctxs = ctx :: e.ctxs ; view = e.view }
-    let ($>) e0 view = { ctxs = e0.ctxs; view }
-    let ($>>) e0 e = { ctxs = e0.ctxs @ e.ctxs; view = e.view }
+    let (^>) ctx v = mk ctx v
+    let (^>>) ctx e = inside ctx e
   end
   include Infix
-    
+   
   let view e = e.view
-  let ctxs e = e.ctxs
+  let ctx e = e.ctx
 
-  let rec plugs ctxs view =
-    match ctxs with
-    | [] -> view
-    | h :: t -> plug h @@ plugs t view
-  let expr { ctxs; view } = plugs ctxs view
-
-  let pp fmt x = E.pp fmt (expr x)
+  let pp fmt {ctx;view} =
+    Fmt.pf fmt "@[@[%a@] ▷@ @[%a@]@]" pp_context ctx pp_expr view
 end
 
 module Trace = struct
