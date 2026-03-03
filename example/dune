@@ -2,5 +2,5 @@
  (name lambda)
  (modules Lambda)
  (libraries fmt trace peahell)
- (preprocess (pps ppx_deriving.show))
+ (preprocess (pps ppx_deriving.show lens.ppx_deriving))
 )

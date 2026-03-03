@@ -54,17 +54,21 @@ end
 
 module Make (X : sig
     type state
+    type step
     type configuration
-    type value
   end) = struct
 
   include X
 
+  type 'a expr = { view : 'a ; lens : (configuration, 'a) Lens.t }
+  let view x = x.view
+  let sub e l view = { view; lens = Lens.compose l e.lens}
+  
   type _ Effect.t +=
     | Update : (state -> state) -> state Effect.t
-    | Enter : configuration -> unit Effect.t
-    | Exit : value -> unit Effect.t
-    | Yield : configuration -> unit Effect.t          
+    | Swap : 'a expr -> unit Effect.t
+    | Enter : unit Effect.t
+    | Step : step -> unit Effect.t          
 
   let get () =
     Effect.perform @@ Update (fun st -> st)
@@ -75,40 +79,61 @@ module Make (X : sig
   let update up =
     Effect.perform @@ Update up
 
-  let yield c = Effect.perform @@ Yield c
-  let recurse f (x : configuration) =
-    Effect.perform @@ Enter x;
-    let v = f x in
-    Effect.perform @@ Exit v;
-    v
+  let step st =
+    Effect.perform @@ Step st
+      
+  let enter () =
+    Effect.perform Enter
 
-  let run f st0 c0 : _ Seq.t =
+  let swap e =
+    Effect.perform @@ Swap e
+
+  let map f {view;lens} =
+    let e = {lens; view = f view} in
+    Effect.perform (Swap e);
+    e
+  
+  let run f ~state:st0 e0=
     let st : state ref = ref st0 in
-    match f c0 with
+    let e : configuration ref = ref e0 in
+    match f {view = e0; lens = Lens.id} with
     | c -> c
-    | effect Yield _, k ->
+    | effect Step _, k ->
       Effect.Deep.continue k ()
-    | effect Enter _, k ->
+    | effect Enter, k ->
       Effect.Deep.continue k ()
-    | effect Exit _, k ->
+    | effect Swap {view; lens}, k ->
+      e := lens.set view !e;
       Effect.Deep.continue k ()
     | effect Update up, k ->
       st := up !st;
       Effect.Deep.continue k !st
 
-  let steps f ~state c : _ Trace.t =
-    let st : state ref = ref state in
-    fun () -> match f c with
+  let steps f ~state:st0 e0 : _ Trace.t =
+    let st : state ref = ref st0 in
+    let e : configuration ref = ref e0 in
+    fun () -> match f {view = e0; lens = Lens.id} with
       | c -> Return (!st, c)
       | exception exn -> Error exn
-      | effect Yield c, k ->
-        Trace.Cons ((!st, c), Effect.Deep.continue k)
-      | effect Enter c, k ->
-        Trace.Cons ((!st, c), Effect.Deep.continue k)
-      | effect Exit _v, k ->
+      | effect Step c, k ->
+        Trace.Cons ((!st, !e, c), Effect.Deep.continue k)
+      | effect Enter, k ->
+        Effect.Deep.continue k ()
+      | effect Swap {view; lens}, k ->
+        e := lens.set view !e;
         Effect.Deep.continue k ()
       | effect Update up, k ->
         st := up !st;
         Effect.Deep.continue k !st
 
+  module List = struct
+
+    let map f {view; lens} =
+      List.mapi (fun i view ->
+          let lens = Lens.compose (Lens.for_list i) lens in
+          f {view; lens}
+        )
+        view
+
+  end
 end
