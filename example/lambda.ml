@@ -59,10 +59,14 @@ module E = Make(struct
   end)
 open E
 
-let pp_stateconf fmt ([st; e] : (_, v conf * v) E.Arg.list) =
-  Fmt.pf fmt "@[%a@] × @[%a@]" pp_v st pp_expr e
-let pp_ret fmt (st, v) =
-  Fmt.pf fmt "@[%a@] × @[%a@]" pp_v (Conf.view st) pp_v v
+type conf = (v ref -> expr I.t -> v, v) Arg.list
+
+let pp_stateconf fmt ( [M st; I e] : conf) =
+  Fmt.pf fmt "@[%a@] × @[%a@]" pp_v !(st.v) pp_expr e
+[@@warning "-8"]
+
+let pp_ret fmt v =
+  Fmt.pf fmt "@[%a@]" pp_v v
 
 let pp_trace =
   Fmt.vbox @@ Trace.pp ~pp_sep:(Fmt.any " →@.") (Fmt.pair Fmt.nop pp_stateconf) pp_ret
@@ -73,50 +77,50 @@ let sum vs =
     ) 0 vs)
 
 let stepV e0 ~as_:x =
-  let _ = Conf.set e0 @@ value x in
+  let _ = I.set e0 @@ value x in
   E.step ();
   x
 
 let rec eval st e0 =
-  match Conf.view e0 with
-  | Value v -> st, v
+  match I.view e0 with
+  | Value v -> v
   | App (f, arg) ->
-    let f = Conf.sub e0 LensExpr.appL f in
-    let arg = Conf.sub e0 LensExpr.appR arg in
-    let st', f' = eval st f in
-    let st'', arg' = eval st' arg in
+    let f = I.sub e0 LensExpr.appL f in
+    let arg = I.sub e0 LensExpr.appR arg in
+    let f' = eval st f in
+    let arg' = eval st arg in
     begin match f' with
       | Lam l ->
-        let e' = Conf.set e0 @@ l (value arg') in
+        let e' = I.set e0 @@ l (value arg') in
         step ();
-        eval st'' e'
+        eval st e'
       | _ -> failwith "Not a lambda"
     end
   | Add l ->
-    let l = Conf.sub e0 LensExpr.add l in
-    let l' = Conf.list l in
-    let st', vs = List.fold_left_map eval st l' in
+    let l = I.sub e0 LensExpr.add l in
+    let l' = I.list l in
+    let vs = List.map (eval st) l' in
     let v = sum vs in
-    st', stepV e0 ~as_:v
+    stepV e0 ~as_:v
   | Get ->
-    let v = Conf.view st in
-    st, stepV e0 ~as_:v
+    let v = !st in
+    stepV e0 ~as_:v
   | Set e ->
-    let e = Conf.sub e0 LensExpr.set e in
-    let st', v = eval st e in
-    let st'' = Conf.set st' v in
-    st'', stepV e0 ~as_:v
+    let e = I.sub e0 LensExpr.set e in
+    let v = eval st e in
+    st := v;
+    stepV e0 ~as_:v
     
 
 let e0 =
-  App (value @@ Lam (fun x -> Add [x; Get; value (Int 2)]), Set (value (Int 3)))
-  (* Add [v @@ Int 2; Set (v @@ Int 3); Get] *)
+  (* App (value @@ Lam (fun x -> Add [x; Get; value (Int 2)]), Set (value (Int 3))) *)
+  Add [value @@ Int 2; Set (value @@ Int 3); Get]
 
 let () =
   Fmt.pr "Running %a@." pp_expr e0;
   let state = Int 0 in
-  let trace = E.steps eval [state; e0] in
-  Fmt.pr "trace:@.%a →@.%a@." pp_stateconf [state; e0] pp_trace trace
+  let trace = E.steps eval [M (M.ref state); I e0] in
+  Fmt.pr "trace:@.%a@." pp_trace trace
   (* let v = E.run eval ~state e0 in *)
   (* Fmt.pr "v: %a@." pp_v trace *)
   

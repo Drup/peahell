@@ -56,17 +56,9 @@ module Make (X : sig
     type step
   end) = struct
 
-  include X
-
-  type 'a conf = C : {
-      root : 'b ref;
-      lens : ('b, 'a) Lens.t;
-      (* view : 'a ; *)
-    } -> 'a conf
-
   type _ Effect.t +=
     | Enter : unit Effect.t
-    | Step : step -> unit Effect.t
+    | Step : X.step -> unit Effect.t
 
   let step st =
     Effect.perform @@ Step st
@@ -74,9 +66,13 @@ module Make (X : sig
   let enter () =
     Effect.perform Enter
 
-  module Conf = struct
+  module I = struct
 
-    type 'a t = 'a conf
+    type 'a t = C : {
+      root : 'b ref;
+      lens : ('b, 'a) Lens.t;
+      (* view : 'a ; *)
+    } -> 'a t
 
     let init x = C { root = x ; lens = Lens.id }
     
@@ -98,29 +94,70 @@ module Make (X : sig
 
   end
 
+
+  module M = struct 
+
+    module type S = sig
+      type t
+      val snapshot : t -> t
+    end
+
+    type 'a t = {
+      m : (module S with type t = 'a);
+      v : 'a
+    }
+
+    let pp (ppf : 'a Fmt.t) fmt mv = ppf fmt mv.v
+
+    let mk (type a) ~snapshot v =
+      let module M = struct
+        type t = a
+        let snapshot = snapshot
+      end in
+      { m = (module M) ; v}
+    
+    let ref v0 =
+      let snapshot x = ref !x in
+      mk ~snapshot (ref v0)
+    
+  end
+    
+
   module Arg = struct
+
+    type (_,_) t =
+      | I : 'a -> ('a I.t -> 'x, 'x) t
+      | M : 'a M.t -> ('a -> 'x, 'x) t
 
     type (_,_) list =
       | [] : ('a, 'a) list
-      | (::) : 'a * ('b, 'x) list -> ('a Conf.t -> 'b, 'x) list
+      | (::) : ('a, 'b) t * ('b, 'c) list -> ('a, 'c) list
 
+    type (_,_) r =
+      | I : 'a ref -> ('a I.t -> 'x, 'x) r
+      | M : 'a M.t -> ('a -> 'x, 'x) r
+    
     type (_,_) refs =
       | [] : ('a, 'a) refs
-      | (::) : 'a ref * ('b, 'x) refs -> ('a Conf.t -> 'b, 'x) refs
+      | (::) : ('a, 'b) r * ('b, 'c) refs -> ('a, 'c) refs
 
     let rec as_refs : type a x . (a, x) list -> (a, x) refs = function
       | [] -> []
-      | v :: t -> ref v :: as_refs t
+      | I v :: t -> I (ref v) :: as_refs t
+      | M v :: t -> M v :: as_refs t
 
     let rec as_values : type a x . (a, x) refs -> (a, x) list = function
       | [] -> []
-      | r0 :: t -> !r0 :: as_values t
+      | I r :: t -> I !r :: as_values t
+      | M ({m = (module M); v} as mv) :: t ->
+        M {mv with v = M.snapshot v} :: as_values t
 
     let rec process_args
       : type a x . (a, x) refs -> a -> x
       = fun l run -> match l with
         | [] -> run
-        | r :: t -> process_args t (run @@ Conf.init r )
+        | I r :: t -> process_args t (run @@ I.init r )
+        | M mv :: t -> process_args t (run @@ mv.v )
 
   end
 
