@@ -52,70 +52,71 @@ module LensExpr = struct
 
 end
 
-let v x = Value x
+let value x = Value x
 
 module E = Make(struct
-    type state = v
-    type configuration = expr
     type step = unit
   end)
+open E
 
-let pp_stateconf fmt (st, e, ()) =
+let pp_stateconf fmt ([st; e] : (_, v conf * v) E.Arg.list) =
   Fmt.pf fmt "@[%a@] × @[%a@]" pp_v st pp_expr e
 let pp_ret fmt (st, v) =
-  Fmt.pf fmt "@[%a@] × @[%a@]" pp_v st pp_v v
+  Fmt.pf fmt "@[%a@] × @[%a@]" pp_v (Conf.view st) pp_v v
 
 let pp_trace =
-  Fmt.vbox @@ Trace.pp ~pp_sep:(Fmt.any " →@.") pp_stateconf pp_ret
+  Fmt.vbox @@ Trace.pp ~pp_sep:(Fmt.any " →@.") (Fmt.pair Fmt.nop pp_stateconf) pp_ret
 
 let sum vs =
   Int (List.fold_left (fun s v ->
       match v with Int i -> s+i | _ -> failwith "not an int"
     ) 0 vs)
 
-let return e ~as_:x =
-  E.swap {view = (v x); lens = e.E.lens};
+let stepV e0 ~as_:x =
+  let _ = Conf.set e0 @@ value x in
   E.step ();
   x
 
-let rec eval e0 =
-  match E.view e0 with
-  | Value v -> v
+let rec eval st e0 =
+  match Conf.view e0 with
+  | Value v -> st, v
   | App (f, arg) ->
-    let f = E.sub e0 LensExpr.appL f in
-    let arg = E.sub e0 LensExpr.appR arg in
-    let f' = eval f in
-    let arg' = eval arg in
+    let f = Conf.sub e0 LensExpr.appL f in
+    let arg = Conf.sub e0 LensExpr.appR arg in
+    let st', f' = eval st f in
+    let st'', arg' = eval st' arg in
     begin match f' with
       | Lam l ->
-        let e' = E.map (fun _ -> l (v arg')) e0 in
-        eval e'
-      | _ -> failwith "foo"
+        let e' = Conf.set e0 @@ l (value arg') in
+        step ();
+        eval st'' e'
+      | _ -> failwith "Not a lambda"
     end
   | Add l ->
-    let l = E.sub e0 LensExpr.add l in
-    let vs = E.List.map eval l in
+    let l = Conf.sub e0 LensExpr.add l in
+    let l' = Conf.list l in
+    let st', vs = List.fold_left_map eval st l' in
     let v = sum vs in
-    return e0 ~as_:v    
+    st', stepV e0 ~as_:v
   | Get ->
-    let v = E.get () in
-    return e0 ~as_:v
+    let v = Conf.view st in
+    st, stepV e0 ~as_:v
   | Set e ->
-    let e = E.sub e0 LensExpr.set e in
-    let v = eval e in
-    E.set v;
-    return e0 ~as_:v
+    let e = Conf.sub e0 LensExpr.set e in
+    let st', v = eval st e in
+    let st'' = Conf.set st' v in
+    st'', stepV e0 ~as_:v
     
 
 let e0 =
-  App (v @@ Lam (fun x -> Add [x; Get; v (Int 2)]), Set (v (Int 3)))
+  App (value @@ Lam (fun x -> Add [x; Get; value (Int 2)]), Set (value (Int 3)))
   (* Add [v @@ Int 2; Set (v @@ Int 3); Get] *)
 
 let () =
   Fmt.pr "Running %a@." pp_expr e0;
   let state = Int 0 in
-  let trace = E.steps eval ~state e0 in
-  Fmt.pr "trace:@.%a →@.%a@." pp_stateconf (state, e0, ()) pp_trace trace
+  let trace = E.steps eval [state; e0] in
+  Fmt.pr "trace:@.%a →@.%a@." pp_stateconf [state; e0] pp_trace trace
   (* let v = E.run eval ~state e0 in *)
   (* Fmt.pr "v: %a@." pp_v trace *)
   
