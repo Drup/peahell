@@ -1,6 +1,5 @@
-(executable
- (name lambda)
- (modules Lambda)
+(executables
+ (names lambda ccs)
  (libraries fmt trace peahell)
  (preprocess (pps ppx_deriving.show lens.ppx_deriving))
 )

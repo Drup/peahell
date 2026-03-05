@@ -82,7 +82,7 @@ module I = struct
 
 end
 
-module M = struct 
+module NI = struct 
 
   module type S = sig
     type t
@@ -126,7 +126,7 @@ module Conf = struct
 
     type (_,_) one =
       | I : 'a ref -> ('a imm -> 'x, 'x) one
-      | M : 'a M.state -> ('a mut -> 'x, 'x) one
+      | M : 'a NI.state -> ('a mut -> 'x, 'x) one
 
     type (_,_) t =
       | [] : ('a, 'a) t
@@ -154,14 +154,14 @@ end
 module Arg = struct
   type (_,_) one =
     | I : 'a -> ('a Conf.imm -> 'x, 'x) one
-    | M : 'a M.state -> ('a Conf.mut -> 'x, 'x) one
+    | M : 'a NI.state -> ('a Conf.mut -> 'x, 'x) one
 
   type (_,_) t =
     | [] : ('a, 'a) t
     | (::) : ('a, 'b) one * ('b, 'c) t -> ('a, 'c) t
 
   let i x = I x
-  let m ~snapshot x = M (M.mk ~snapshot x)
+  let m ~snapshot x = M (NI.mk ~snapshot x)
 
   let ref v0 =
     let snapshot x = ref !x in
@@ -184,6 +184,7 @@ module Make (X : sig
   type _ Effect.t +=
     | Enter : unit Effect.t
     | Step : X.step -> unit Effect.t
+    | Choice : int -> int Effect.t
 
   let step st =
     Effect.perform @@ Step st
@@ -191,25 +192,107 @@ module Make (X : sig
   let enter () =
     Effect.perform Enter
 
+  module Choice = struct
+
+    let int n = Effect.perform (Choice n)
+    let one_of fs =
+      let l = List.length fs in
+      let k = int l in
+      List.nth fs k
+
+    type 'a task = Todo of (unit -> 'a) | Done of 'a
+    let rec all_done = function
+      | [] -> `Yes []
+      | (k, Done v) :: t ->
+        begin match all_done t with
+          | `Yes l -> `Yes ((k, v) :: l)
+          | `No l -> `No l
+        end
+      | (k, Todo f) :: t ->
+        begin match all_done t with
+          | `Yes _ -> `No [k, f]
+          | `No l -> `No ((k, f) :: l)
+        end
+    let tasks_assoc l =
+      let tasks = List.map (fun (k, x) -> k, Todo x) l in
+      let rec go tasks = match all_done tasks with
+        | `Yes vs -> vs
+        | `No todos ->
+          let k, f = one_of todos in
+          let tasks =
+            List.map
+              (fun (k', v) -> k', (if k = k' then Done (f ()) else v))
+              tasks
+          in
+          go tasks
+      in
+      go tasks
+
+    let tasks l =
+      List.map snd @@ tasks_assoc @@ List.mapi (fun i x -> i, x) l
+    let map f l =
+      List.map snd @@ tasks_assoc @@ List.mapi (fun i x -> i, fun () -> f x) l
+        
+    let pair f1 f2 =
+      let[@warning "-8"] [v1, v2] = tasks [f1; f2] in
+      v1, v2
+
+    let (|||) = pair
+
+  end
+
   type ('a, 'x) trace = (X.step * ('a, 'x) Conf.t, 'x) Trace.t
 
-  let run f l =
+  module S = Effect.Shallow
+  
+  let run ?(random=Random.State.make_self_init ()) f l =
     let conf = Arg.conf l in
-    match Conf.State.run conf f with
-    | c -> c
-    | effect Step _, k ->
-      Effect.Deep.continue k ()
-    | effect Enter, k ->
-      Effect.Deep.continue k ()
+    let rec go : type a . (a, _) S.continuation -> a -> _
+      = fun k x ->
+        S.continue_with k x {
+          retc = Fun.id;
+          exnc = raise;
+          effc = fun (type b) (eff : b Effect.t) ->
+            match eff with
+            | Step _ -> Some (fun (k : (b, _) S.continuation) ->
+                go k ()
+              )
+            | Enter -> Some (fun (k : (b, _) S.continuation) ->
+                go k ()
+              )
+            | Choice n -> Some (fun (k : (b, _) S.continuation) ->
+                go k (Random.State.int random n)
+              )
+            | _ -> None
+        }
+    in
+    go (S.fiber @@ Conf.State.run conf) f
 
-  let trace f l : _ Trace.t =
+
+  let trace ?(random=Random.State.make_self_init ()) f l : _ Trace.t =
     let conf = Arg.conf l in
-    fun () -> match Conf.State.run conf f with
-      | c -> Return c
-      | exception exn -> Error exn
-      | effect Step c, k ->
-        Trace.Cons ((c, Conf.State.snapshot conf), Effect.Deep.continue k)
-      | effect Enter, k ->
-        Effect.Deep.continue k ()
+    let retc x = Trace.Return x in
+    let exnc err = Trace.Error err in
+    let rec go : type a . (a, _) S.continuation -> a -> _
+      = fun k x () ->
+        S.continue_with k x {
+          retc; exnc;
+          effc = fun (type b) (eff : b Effect.t) ->
+            match eff with
+            | Step c -> Some (fun (k : (b, _) S.continuation) ->
+                Trace.Cons (
+                  (c, Conf.State.snapshot conf),
+                  go k ())
+              )
+            | Enter -> Some (fun (k : (b, _) S.continuation) ->
+                go k () ()
+              )
+            | Choice n -> Some (fun (k : (b, _) S.continuation) ->
+                go k (Random.State.int random n) ()
+              )
+            | _ -> None
+        }
+    in
+    go (S.fiber @@ Conf.State.run conf) f
 
 end
