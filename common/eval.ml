@@ -52,6 +52,28 @@ module Trace = struct
       Format.pp_print_string fmt (Printexc.to_string exn)
 end
 
+module Tree = struct
+
+  type ('state, 'v) node =
+    | Cons of 'state * ('state, 'v) t
+    | Return of 'v
+    | Error of exn
+    | Choice of ('state, 'v) t list
+  and ('state, 'v) t = unit -> ('state, 'v) node   
+  
+  let rec pp pp_elt pp_end fmt k =
+    match k () with
+    | Cons (x, next) ->
+      pp_elt fmt x;
+      pp pp_elt pp_end fmt next
+    | Return v ->
+      pp_end fmt v
+    | Error exn ->
+      Fmt.exn fmt exn
+    | Choice l ->
+      Fmt.pf fmt "@[<v 2>Choice [@,%a@]@,]"
+        (Fmt.list @@ pp pp_elt pp_end) l
+end
 
 module I = struct
 
@@ -317,4 +339,35 @@ module Make (X : sig
     in
     go (S.fiber @@ Conf.State.run conf) f
 
+  module MS = Multicont.Shallow
+
+  let tree f l : _ Tree.t =
+    let conf = Arg.conf l in
+    let retc x = Tree.Return x in
+    let exnc err = Tree.Error err in
+    let rec go : type a . (a, _) MS.resumption -> a -> _
+      = fun k x () ->
+        MS.resume_with k x {
+          retc; exnc;
+          effc = fun (type b) (eff : b Effect.t) ->
+            match eff with
+            | Step c -> Some (fun (k : (b, _) S.continuation) ->
+                let k = MS.promote k in
+                Tree.Cons (
+                  (c, Conf.State.snapshot conf),
+                  go k ())
+              )
+            | Enter -> Some (fun (k : (b, _) S.continuation) ->
+                let k = MS.promote k in
+                go k () ()
+              )
+            | Choice n -> Some (fun (k : (b, _) S.continuation) ->
+                let k = Multicont.Shallow.promote k in
+                Tree.Choice (List.init n (fun v -> go k v))
+              )
+            | _ -> None
+        }
+    in
+    go (MS.promote @@ S.fiber @@ Conf.State.run conf) f
+  
 end

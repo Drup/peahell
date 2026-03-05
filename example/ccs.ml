@@ -19,7 +19,8 @@ let snd = Accessor_base.Tuple2.snd
 type red = proc I.t -> unit
 type step = lbl
 
-exception Stuck
+exception Stuck of string
+let stuck fmt = Fmt.kstr (fun s -> raise @@ Stuck s) fmt
 
 module Interp = Make(struct type nonrec step = step end)
 
@@ -29,7 +30,7 @@ let compatible_lbl l1 l2 = match l1, l2 with
 
 let rec try_eval p0 =
   match I.view p0 with
-  | Nop -> raise Stuck 
+  | Nop -> stuck "nop"
   | Lbl (l, p) -> l, p
   | Par (p1, p2) ->
     let p1 = I.sub p0 Accessor.(A.par @> fst) p1 in
@@ -47,7 +48,7 @@ let rec try_eval p0 =
          if compatible_lbl l1 l2 then
            Tau, Par (p1, p2)
          else
-           raise Stuck
+           stuck "%a vs. %a" pp_lbl l1 pp_lbl l2
       )
     ] ()
   | Choice p ->
@@ -57,8 +58,8 @@ let rec try_eval p0 =
     let p = I.sub p0 Accessor.(A.mu @> snd) p in
     let l, p' = try_eval p in
     match l with
-    | Send n' when n = n' -> raise Stuck
-    | Recv n' when n = n' -> raise Stuck
+    | Send n' when n = n' -> stuck "Bound %a" pp_lbl l
+    | Recv n' when n = n' -> stuck "Bound %a" pp_lbl l
     | _ -> l, Mu (n, p')
 
 and eval p =
@@ -73,7 +74,7 @@ let pp_stateconf fmt (s, [I p] : step * (red, unit) Conf.t) =
   Fmt.pf fmt "-%a→ @[%a@]@," pp_lbl s pp_proc p
 [@@warning "-8"]
 
-let pp_trace = Fmt.vbox @@ Trace.pp pp_stateconf Fmt.nop
+let pp_tree = Fmt.vbox @@ Tree.pp pp_stateconf Fmt.nop
 
 module P = struct
 
@@ -96,7 +97,7 @@ let e0 =
 
 let () =
   Fmt.pr "Running %a@." pp_proc e0;
-  let trace = Interp.trace eval Arg.[i e0] in
-  Fmt.pr "trace:@.%a@." pp_trace trace
+  let tree = Interp.tree eval Arg.[i e0] in
+  Fmt.pr "trace:@.%a@." pp_tree tree
   (* let v = E.run eval ~state e0 in *)
   (* Fmt.pr "v: %a@." pp_v trace *)
