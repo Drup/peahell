@@ -56,7 +56,7 @@ let value x = V x
 
 (** The type of our reduction and our step *)
 type red = v ref -> expr I.t -> v
-type step = unit
+type step = Step
 
 module Interp = Make(struct type nonrec step = step end)
 
@@ -67,7 +67,7 @@ let sum vs =
 
 let stepV e0 ~as_:x =
   let _ = I.set e0 @@ value x in
-  Interp.step ();
+  Interp.step Step;
   x
 
 let rec eval st e0 =
@@ -81,7 +81,7 @@ let rec eval st e0 =
     begin match f' with
       | Lam l ->
         let e' = I.set e0 @@ l (value arg') in
-        Interp.step ();
+        Interp.step Step;
         eval st e'
       | _ -> failwith "Not a lambda"
     end
@@ -102,7 +102,7 @@ let rec eval st e0 =
 
 (** Printing the trace *)
 
-let pp_stateconf fmt ((), [M st; I e] : step * (red, v) Conf.t) =
+let pp_stateconf fmt (Step, [M st; I e] : step * (red, v) Conf.t) =
   Fmt.pf fmt "→ @[%a@] × @[%a@]@," pp_v !st pp_expr e
 [@@warning "-8"]
 
