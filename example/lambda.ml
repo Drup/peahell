@@ -2,7 +2,7 @@ open Peahell__.Eval
 
 type v = Int of int | Lam of (expr -> expr)
 and expr =
-  | Value of v
+  | V of v
   | App of expr * expr
   | Add of expr list
   | Get
@@ -26,8 +26,8 @@ end
 module LensExpr = struct
 
   let value =
-    let get = function Value v -> v | _ -> invalid_arg "Wrong Constructor Value"
-    and set e' e = match e with Value _ -> Value e' | _ -> invalid_arg "Wrong Constructor Value"
+    let get = function V v -> v | _ -> invalid_arg "Wrong Constructor Value"
+    and set e' e = match e with V _ -> V e' | _ -> invalid_arg "Wrong Constructor Value"
     in {Lens. get; set}
 
   let appL =
@@ -52,24 +52,13 @@ module LensExpr = struct
 
 end
 
-let value x = Value x
+let value x = V x
 
-module E = Make(struct
-    type step = unit
-  end)
-open E
+(** The type of our reduction and our step *)
+type red = v ref -> expr I.t -> v
+type step = unit
 
-type conf = (v ref -> expr I.t -> v, v) Arg.list
-
-let pp_stateconf fmt ( [M st; I e] : conf) =
-  Fmt.pf fmt "@[%a@] × @[%a@]" pp_v !(st.v) pp_expr e
-[@@warning "-8"]
-
-let pp_ret fmt v =
-  Fmt.pf fmt "@[%a@]" pp_v v
-
-let pp_trace =
-  Fmt.vbox @@ Trace.pp ~pp_sep:(Fmt.any " →@.") (Fmt.pair Fmt.nop pp_stateconf) pp_ret
+module Interp = Make(struct type nonrec step = step end)
 
 let sum vs =
   Int (List.fold_left (fun s v ->
@@ -78,12 +67,12 @@ let sum vs =
 
 let stepV e0 ~as_:x =
   let _ = I.set e0 @@ value x in
-  E.step ();
+  Interp.step ();
   x
 
 let rec eval st e0 =
   match I.view e0 with
-  | Value v -> v
+  | V v -> v
   | App (f, arg) ->
     let f = I.sub e0 LensExpr.appL f in
     let arg = I.sub e0 LensExpr.appR arg in
@@ -92,7 +81,7 @@ let rec eval st e0 =
     begin match f' with
       | Lam l ->
         let e' = I.set e0 @@ l (value arg') in
-        step ();
+        Interp.step ();
         eval st e'
       | _ -> failwith "Not a lambda"
     end
@@ -110,16 +99,24 @@ let rec eval st e0 =
     let v = eval st e in
     st := v;
     stepV e0 ~as_:v
-    
+
+(** Printing the trace *)
+
+let pp_stateconf fmt ((), [M st; I e] : step * (red, v) Conf.t) =
+  Fmt.pf fmt "→ @[%a@] × @[%a@]@," pp_v !st pp_expr e
+[@@warning "-8"]
+
+let pp_trace = Fmt.vbox @@ Trace.pp pp_stateconf (Fmt.box pp_v)
+
 
 let e0 =
-  (* App (value @@ Lam (fun x -> Add [x; Get; value (Int 2)]), Set (value (Int 3))) *)
-  Add [value @@ Int 2; Set (value @@ Int 3); Get]
+  App (value @@ Lam (fun x -> Add [x; Get; value (Int 2)]), Set (value (Int 3)))
+  (* Add [value @@ Int 2; Set (value @@ Int 3); Get] *)
 
 let () =
   Fmt.pr "Running %a@." pp_expr e0;
   let state = Int 0 in
-  let trace = E.steps eval [M (M.ref state); I e0] in
+  let trace = Interp.trace eval Arg.[ref state; i e0] in
   Fmt.pr "trace:@.%a@." pp_trace trace
   (* let v = E.run eval ~state e0 in *)
   (* Fmt.pr "v: %a@." pp_v trace *)

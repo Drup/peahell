@@ -29,11 +29,11 @@ module Expr (E : sig
 end
 
 module Trace = struct
-  type ('a, 'b) node =
-    | Cons of 'a * ('a, 'b) t
-    | Return of 'b
+  type ('state, 'v) node =
+    | Cons of 'state * ('state, 'v) t
+    | Return of 'v
     | Error of exn
-  and ('a, 'b) t = unit -> ('a, 'b) node      
+  and ('state, 'v) t = unit -> ('state, 'v) node      
 
   let rec as_seq k () = match k () with
     | Cons (x, next) ->
@@ -41,15 +41,135 @@ module Trace = struct
     | Return v -> Seq.Cons (`Ret v, Seq.empty)
     | Error exn -> Seq.Cons (`Error exn, Seq.empty)
 
-  let rec pp ?(pp_sep=Fmt.cut) pp_elt pp_end fmt k =
+  let rec pp pp_elt pp_end fmt k =
     match k () with
     | Cons (x, next) ->
-      pp_elt fmt x; pp_sep fmt ();
-      pp ~pp_sep pp_elt pp_end fmt next
+      pp_elt fmt x;
+      pp pp_elt pp_end fmt next
     | Return v ->
       pp_end fmt v
     | Error exn ->
       Format.pp_print_string fmt (Printexc.to_string exn)
+end
+
+
+module I = struct
+
+  type 'a t = C : {
+      root : 'b ref;
+      lens : ('b, 'a) Lens.t;
+      (* view : 'a ; *)
+    } -> 'a t
+
+  let init x = C { root = x ; lens = Lens.id }
+
+  let view (C c) = c.lens.get !(c.root)
+
+  let sub (C c) l _v =
+    let c' = C { c with lens = Lens.compose l c.lens} in
+    (* assert (view c' = v); *)
+    c'
+
+  let map f (C c) =
+    c.root := Lens.modify c.lens f !(c.root);
+    C c
+
+  let set c x = map (fun _ -> x) c
+
+  let list c = 
+    List.mapi (fun i view -> sub c (Lens.for_list i) view) (view c)
+
+end
+
+module M = struct 
+
+  module type S = sig
+    type t
+    val snapshot : t -> t
+  end
+
+  type 'a state = {
+    m : (module S with type t = 'a);
+    v : 'a
+  }
+
+  let pp (ppf : 'a Fmt.t) fmt mv = ppf fmt mv.v
+
+  let mk (type a) ~snapshot v =
+    let module M = struct
+      type t = a
+      let snapshot = snapshot
+    end in
+    { m = (module M) ; v}
+
+end
+
+module Conf = struct
+
+  type 'a mut = 'a
+  type 'a imm = 'a I.t
+
+  module Val = struct
+
+    type (_,_) one =
+      | I : 'a -> ('a imm -> 'x, 'x) one
+      | M : 'a -> ('a mut -> 'x, 'x) one
+
+    type (_,_) t =
+      | [] : ('a, 'a) t
+      | (::) : ('a, 'b) one * ('b, 'c) t -> ('a, 'c) t
+
+  end
+
+  module State = struct
+
+    type (_,_) one =
+      | I : 'a ref -> ('a imm -> 'x, 'x) one
+      | M : 'a M.state -> ('a mut -> 'x, 'x) one
+
+    type (_,_) t =
+      | [] : ('a, 'a) t
+      | (::) : ('a, 'b) one * ('b, 'c) t -> ('a, 'c) t
+
+    let rec run
+      : type a x . (a, x) t -> a -> x
+      = fun l f -> match l with
+        | [] -> f
+        | I r :: t -> run t (f @@ I.init r )
+        | M mv :: t -> run t (f @@ mv.v )
+
+    let rec snapshot : type a x . (a, x) t -> (a, x) Val.t = function
+      | [] -> []
+      | I r :: t -> I !r :: snapshot t
+      | M {m = (module M); v} :: t ->
+        M (M.snapshot v) :: snapshot t
+
+  end
+
+  include Val
+
+end
+
+module Arg = struct
+  type (_,_) one =
+    | I : 'a -> ('a Conf.imm -> 'x, 'x) one
+    | M : 'a M.state -> ('a Conf.mut -> 'x, 'x) one
+
+  type (_,_) t =
+    | [] : ('a, 'a) t
+    | (::) : ('a, 'b) one * ('b, 'c) t -> ('a, 'c) t
+
+  let i x = I x
+  let m ~snapshot x = M (M.mk ~snapshot x)
+
+  let ref v0 =
+    let snapshot x = ref !x in
+    m ~snapshot (ref v0)
+
+  let rec conf : type a x . (a, x) t -> (a, x) Conf.State.t = function
+    | [] -> []
+    | I v :: t -> I (Stdlib.ref v) :: conf t
+    | M v :: t -> M v :: conf t
 end
 
 module Make (X : sig
@@ -66,117 +186,25 @@ module Make (X : sig
   let enter () =
     Effect.perform Enter
 
-  module I = struct
 
-    type 'a t = C : {
-      root : 'b ref;
-      lens : ('b, 'a) Lens.t;
-      (* view : 'a ; *)
-    } -> 'a t
-
-    let init x = C { root = x ; lens = Lens.id }
-    
-    let view (C c) = c.lens.get !(c.root)
-
-    let sub (C c) l _v =
-      let c' = C { c with lens = Lens.compose l c.lens} in
-      (* assert (view c' = v); *)
-      c'
-
-    let map f (C c) =
-      c.root := Lens.modify c.lens f !(c.root);
-      C c
-
-    let set c x = map (fun _ -> x) c
-
-    let list c = 
-      List.mapi (fun i view -> sub c (Lens.for_list i) view) (view c)
-
-  end
-
-
-  module M = struct 
-
-    module type S = sig
-      type t
-      val snapshot : t -> t
-    end
-
-    type 'a t = {
-      m : (module S with type t = 'a);
-      v : 'a
-    }
-
-    let pp (ppf : 'a Fmt.t) fmt mv = ppf fmt mv.v
-
-    let mk (type a) ~snapshot v =
-      let module M = struct
-        type t = a
-        let snapshot = snapshot
-      end in
-      { m = (module M) ; v}
-    
-    let ref v0 =
-      let snapshot x = ref !x in
-      mk ~snapshot (ref v0)
-    
-  end
-    
-
-  module Arg = struct
-
-    type (_,_) t =
-      | I : 'a -> ('a I.t -> 'x, 'x) t
-      | M : 'a M.t -> ('a -> 'x, 'x) t
-
-    type (_,_) list =
-      | [] : ('a, 'a) list
-      | (::) : ('a, 'b) t * ('b, 'c) list -> ('a, 'c) list
-
-    type (_,_) r =
-      | I : 'a ref -> ('a I.t -> 'x, 'x) r
-      | M : 'a M.t -> ('a -> 'x, 'x) r
-    
-    type (_,_) refs =
-      | [] : ('a, 'a) refs
-      | (::) : ('a, 'b) r * ('b, 'c) refs -> ('a, 'c) refs
-
-    let rec as_refs : type a x . (a, x) list -> (a, x) refs = function
-      | [] -> []
-      | I v :: t -> I (ref v) :: as_refs t
-      | M v :: t -> M v :: as_refs t
-
-    let rec as_values : type a x . (a, x) refs -> (a, x) list = function
-      | [] -> []
-      | I r :: t -> I !r :: as_values t
-      | M ({m = (module M); v} as mv) :: t ->
-        M {mv with v = M.snapshot v} :: as_values t
-
-    let rec process_args
-      : type a x . (a, x) refs -> a -> x
-      = fun l run -> match l with
-        | [] -> run
-        | I r :: t -> process_args t (run @@ I.init r )
-        | M mv :: t -> process_args t (run @@ mv.v )
-
-  end
+  type ('a, 'x) trace = (X.step * ('a, 'x) Conf.t, 'x) Trace.t
 
   let run f l =
-    let refs = Arg.as_refs l in
-    match Arg.process_args refs f with
+    let conf = Arg.conf l in
+    match Conf.State.run conf f with
     | c -> c
     | effect Step _, k ->
       Effect.Deep.continue k ()
     | effect Enter, k ->
       Effect.Deep.continue k ()
 
-  let steps f l : _ Trace.t =
-    let refs = Arg.as_refs l in
-    fun () -> match Arg.process_args refs f with
+  let trace f l : _ Trace.t =
+    let conf = Arg.conf l in
+    fun () -> match Conf.State.run conf f with
       | c -> Return c
       | exception exn -> Error exn
       | effect Step c, k ->
-        Trace.Cons ((c, Arg.as_values refs), Effect.Deep.continue k)
+        Trace.Cons ((c, Conf.State.snapshot conf), Effect.Deep.continue k)
       | effect Enter, k ->
         Effect.Deep.continue k ()
 
