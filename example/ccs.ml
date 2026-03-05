@@ -1,43 +1,19 @@
 open Peahell__.Eval
 
 type name = string
-and lbl = Tau | Send of name | Recv of name
+[@@deriving show { with_path = false }]
+
+type lbl = Tau | Send of name | Recv of name
 and proc =
   | Nop
   | Choice of proc list
   | Mu of name * proc
   | Lbl of lbl * proc
   | Par of proc * proc
-[@@deriving show { with_path = false }]
+[@@deriving show { with_path = false }, accessors ~submodule:A]
 
-module LensProc = struct
-
-  let parL =
-    let get = function Par (v,_) -> v | _ -> invalid_arg "Wrong Constructor Par"
-    and set e' e = match e with Par (_, v) -> Par (e', v) | _ -> invalid_arg "Wrong Constructor Par"
-    in {Lens. get; set}
-
-  let parR =
-    let get = function Par (_,v) -> v | _ -> invalid_arg "Wrong Constructor Par"
-    and set e' e = match e with Par (v, _) -> Par (v, e') | _ -> invalid_arg "Wrong Constructor Par"
-    in {Lens. get; set}
-
-  let choice =
-    let get = function Choice v -> v | _ -> invalid_arg "Wrong Constructor Choice"
-    and set e' e = match e with Choice _ -> Choice e' | _ -> invalid_arg "Wrong Constructor Choice"
-    in {Lens. get; set}
-
-  let muL =
-    let get = function Mu (v,_) -> v | _ -> invalid_arg "Wrong Constructor Mu"
-    and set e' e = match e with Mu (_, v) -> Mu (e', v) | _ -> invalid_arg "Wrong Constructor Mu"
-    in {Lens. get; set}
-
-  let muR =
-    let get = function Mu (_,v) -> v | _ -> invalid_arg "Wrong Constructor Mu"
-    and set e' e = match e with Mu (v, _) -> Mu (v, e') | _ -> invalid_arg "Wrong Constructor Mu"
-    in {Lens. get; set}
-
-end
+let fst = Accessor_base.Tuple2.fst
+let snd = Accessor_base.Tuple2.snd
 
 (** The type of our reduction and our step *)
 type red = proc I.t -> unit
@@ -56,8 +32,8 @@ let rec try_eval p0 =
   | Nop -> raise Stuck 
   | Lbl (l, p) -> l, p
   | Par (p1, p2) ->
-    let p1 = I.sub p0 LensProc.parL p1 in
-    let p2 = I.sub p0 LensProc.parR p2 in
+    let p1 = I.sub p0 Accessor.(A.par @> fst) p1 in
+    let p2 = I.sub p0 Accessor.(A.par @> snd) p2 in
     Interp.Choice.one_of [
       (fun () ->
          let l, p1 = try_eval p1 in l, Par (p1, I.view p2)
@@ -75,10 +51,10 @@ let rec try_eval p0 =
       )
     ] ()
   | Choice p ->
-    let p = I.sub p0 LensProc.choice p in
+    let p = I.sub p0 A.choice p in
     try_eval @@ Interp.Choice.one_of @@ I.list p
   | Mu (n, p) ->
-    let p = I.sub p0 LensProc.muR p in
+    let p = I.sub p0 Accessor.(A.mu @> snd) p in
     let l, p' = try_eval p in
     match l with
     | Send n' when n = n' -> raise Stuck
@@ -113,7 +89,7 @@ end
 let e0 =
   P.(let* a = "a" in
      let* b = "b" in
-     (a ** nop + b ** nop)
+     a ** nop + b ** nop
      || (Send "c" ** -a ** nop)
     )
   
