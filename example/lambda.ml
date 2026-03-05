@@ -56,7 +56,7 @@ let value x = V x
 
 (** The type of our reduction and our step *)
 type red = v ref -> expr I.t -> v
-type step = Step
+type step = string
 
 module Interp = Make(struct type nonrec step = step end)
 
@@ -65,9 +65,9 @@ let sum vs =
       match v with Int i -> s+i | _ -> failwith "not an int"
     ) 0 vs)
 
-let stepV e0 ~as_:x =
+let stepV s e0 ~as_:x =
   let _ = I.set e0 @@ value x in
-  Interp.step Step;
+  Interp.step s;
   x
 
 let rec eval st e0 =
@@ -81,7 +81,7 @@ let rec eval st e0 =
     begin match f' with
       | Lam l ->
         let e' = I.set e0 @@ l (value arg') in
-        Interp.step Step;
+        Interp.step "app";
         eval st e'
       | _ -> failwith "Not a lambda"
     end
@@ -90,20 +90,20 @@ let rec eval st e0 =
     let l' = I.list l in
     let vs = List.map (eval st) l' in
     let v = sum vs in
-    stepV e0 ~as_:v
+    stepV "add" e0 ~as_:v
   | Get ->
     let v = !st in
-    stepV e0 ~as_:v
+    stepV "get" e0 ~as_:v
   | Set e ->
     let e = I.sub e0 LensExpr.set e in
     let v = eval st e in
     st := v;
-    stepV e0 ~as_:v
+    stepV "set" e0 ~as_:v
 
 (** Printing the trace *)
 
-let pp_stateconf fmt (Step, [M st; I e] : step * (red, v) Conf.t) =
-  Fmt.pf fmt "→ @[%a@] × @[%a@]@," pp_v !st pp_expr e
+let pp_stateconf fmt (s, [M st; I e] : step * (red, v) Conf.t) =
+  Fmt.pf fmt "-%s→ @[%a@] × @[%a@]@," s pp_v !st pp_expr e
 [@@warning "-8"]
 
 let pp_trace = Fmt.vbox @@ Trace.pp pp_stateconf (Fmt.box pp_v)
