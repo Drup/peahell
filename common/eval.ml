@@ -58,21 +58,22 @@ module I = struct
   type 'a t = C : {
       root : 'b ref;
       lens : ('b, 'a) Lens.t;
-      (* view : 'a ; *)
+      view : 'a;
     } -> 'a t
 
-  let init x = C { root = x ; lens = Lens.id }
+  let init x = C { root = x ; view = !x ; lens = Lens.id }
 
-  let view (C c) = c.lens.get !(c.root)
+  let view (C c) = c.view
 
-  let sub (C c) l _v =
-    let c' = C { c with lens = Lens.compose l c.lens} in
-    (* assert (view c' = v); *)
+  let sub (C c) l v =
+    let c' = C { c with view = l.get c.view ; lens = Lens.compose l c.lens} in
+    assert (view c' == v);
     c'
 
   let map f (C c) =
-    c.root := Lens.modify c.lens f !(c.root);
-    C c
+    let v' = f c.view in
+    c.root := c.lens.set v' !(c.root);
+    C {c with view = v'}
 
   let set c x = map (fun _ -> x) c
 
@@ -166,6 +167,10 @@ module Arg = struct
     let snapshot x = ref !x in
     m ~snapshot (ref v0)
 
+  let pure v =
+    let snapshot x = x in
+    m ~snapshot v 
+
   let rec conf : type a x . (a, x) t -> (a, x) Conf.State.t = function
     | [] -> []
     | I v :: t -> I (Stdlib.ref v) :: conf t
@@ -185,7 +190,6 @@ module Make (X : sig
       
   let enter () =
     Effect.perform Enter
-
 
   type ('a, 'x) trace = (X.step * ('a, 'x) Conf.t, 'x) Trace.t
 
