@@ -34,9 +34,9 @@ module I : sig
   (** [view e] returns the current content. *)
 
   exception Invalid_subterm :
-              'b t * (unit, 'a, 'b, Accessor.optional) Accessor.t -> exn
+              'b t * ('b, 'b, 'a, 'a) Lun.t -> exn
 
-  val sub :'a t -> (unit, 'b, 'a, Accessor.optional) Accessor.t -> 'b -> 'b t
+  val sub :'a t -> ('a, 'a, 'b, 'b) Lun.t  -> 'b -> 'b t
   (** [sub e l v] indicates that the lensed element should now focus on
       the subposition [l].
       The expected value at this position is [v].

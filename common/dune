@@ -2,5 +2,5 @@
  (name peahell)
  (public_name peahell)
  (modules_without_implementation language)
- (libraries fmt trace multicont accessor_base)
+ (libraries fmt trace multicont lun)
 )

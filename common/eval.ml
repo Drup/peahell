@@ -47,53 +47,44 @@ module Tree = struct
 end
 
 module I = struct
-
-  type accessor_kind = Accessor.optional
   
   type 'a t = C : {
       root : 'b ref;
-      lens : (unit, 'a, 'b, accessor_kind) Accessor.t;
+      lens : ('b, 'b, 'a, 'a) Lun.t;
       view : 'a;
     } -> 'a t
 
-  let init x = C { root = x ; view = !x ; lens = Accessor.id }
+  let id () = Lun.lense Fun.id (fun _ x -> x)
+  let init x = C { root = x ; view = !x ; lens = id }
 
   let view (C c) = c.view
 
   exception Invalid_subterm
-            : 'b t * (unit, 'a, 'b, accessor_kind) Accessor.t -> exn
+            : 'b t * ('b, 'b, 'a, 'a) Lun.t -> exn
   
   let sub (C c) l v0 =
-    let view = match Accessor.get_option l c.view with
+    let view = match Lun.get_opt l c.view with
       | None -> raise @@ Invalid_subterm (C c, l)
       | Some v -> v
     in
-    let c' = C { c with view; lens = Accessor.compose c.lens l} in
+    let c' = C { c with view; lens = Lun.(c.lens >> l)} in
     assert (view == v0);
     c'
 
   let map f (C c) =
     let v' = f c.view in
-    c.root := Accessor.set c.lens ~to_:v' !(c.root);
+    c.root := Lun.set c.lens v' !(c.root);
     C {c with view = v'}
 
   let set c x = map (fun _ -> x) c
 
+  let rec set_nth i l elt = match i, l with
+    | _, [] -> []
+    | 0, _h :: t -> elt :: t
+    | n, h :: t -> h :: set_nth (n-1) t elt
+  let list_nth i () = Lun.lense (fun l -> List.nth l i) (set_nth i)
   let list c =
-    let rec set_nth i l elt = match i, l with
-      | _, [] -> []
-      | 0, _h :: t -> elt :: t
-      | n, h :: t -> h :: set_nth (n-1) t elt
-    in
-    let a i =
-      let set = set_nth i in
-      let match_ l = match List.nth_opt l i with
-        | Some v -> Base.Either.First v
-        | None -> Base.Either.Second l
-      in
-      Accessor.optional ~match_ ~set
-    in
-    List.mapi (fun i v -> sub c (a i) v) (view c)
+    List.mapi (fun i v -> sub c (list_nth i) v) (view c)
 
 end
 

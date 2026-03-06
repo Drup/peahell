@@ -10,10 +10,7 @@ and proc =
   | Mu of name * proc
   | Lbl of lbl * proc
   | Par of proc * proc
-[@@deriving show { with_path = false }, accessors ~submodule:A]
-
-let fst = Accessor_base.Tuple2.fst
-let snd = Accessor_base.Tuple2.snd
+[@@deriving show { with_path = false }, lun]
 
 (** The type of our reduction and our step *)
 type red = proc I.t -> unit
@@ -33,8 +30,8 @@ let rec try_eval p0 =
   | Nop -> stuck "nop"
   | Lbl (l, p) -> l, p
   | Par (p1, p2) ->
-    let p1 = I.sub p0 Accessor.(A.par @> fst) p1 in
-    let p2 = I.sub p0 Accessor.(A.par @> snd) p2 in
+    let p1 = I.sub p0 Lun.(proc_Par >> fst) p1 in
+    let p2 = I.sub p0 Lun.(proc_Par >> snd) p2 in
     Interp.Choice.one_of [
       (fun () ->
          let l, p1 = try_eval p1 in l, Par (p1, I.view p2)
@@ -52,10 +49,10 @@ let rec try_eval p0 =
       )
     ] ()
   | Choice p ->
-    let p = I.sub p0 A.choice p in
+    let p = I.sub p0 proc_Choice p in
     try_eval @@ Interp.Choice.one_of @@ I.list p
   | Mu (n, p) ->
-    let p = I.sub p0 Accessor.(A.mu @> snd) p in
+    let p = I.sub p0 Lun.(proc_Mu >> snd) p in
     let l, p' = try_eval p in
     match l with
     | Send n' when n = n' -> stuck "Bound %a" pp_lbl l

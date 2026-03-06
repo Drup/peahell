@@ -3,11 +3,11 @@ open Peahell__.Eval
 type v = Int of int | Lam of (expr -> expr)
 and expr =
   | V of v
-  | App of {f: expr; arg: expr}
+  | App of expr * expr
   | Add of expr list
   | Get
   | Set of expr
-[@@deriving show { with_path = false }, accessors ~submodule:A]
+[@@deriving show { with_path = false }, lun]
 
 let value x = V x
 
@@ -30,9 +30,9 @@ let stepV s e0 ~as_:x =
 let rec eval st e0 =
   match I.view e0 with
   | V v -> v
-  | App {f; arg} ->
-    let f = I.sub e0 A.App.f f in
-    let arg = I.sub e0 A.App.arg arg in
+  | App (f, arg) ->
+    let f = I.sub e0 Lun.(expr_App >> fst) f in
+    let arg = I.sub e0 Lun.(expr_App >> snd) arg in
     let f' = eval st f in
     let arg' = eval st arg in
     begin match f' with
@@ -43,7 +43,7 @@ let rec eval st e0 =
       | _ -> failwith "Not a lambda"
     end
   | Add l ->
-    let l = I.sub e0 A.add l in
+    let l = I.sub e0 expr_Add l in
     let l' = I.list l in
     let vs = List.map (eval st) l' in
     let v = sum vs in
@@ -52,7 +52,7 @@ let rec eval st e0 =
     let v = !st in
     stepV "get" e0 ~as_:v
   | Set e ->
-    let e = I.sub e0 A.set e in
+    let e = I.sub e0 expr_Set e in
     let v = eval st e in
     st := v;
     stepV "set" e0 ~as_:v
@@ -66,7 +66,7 @@ let pp_stateconf fmt (s, [M st; I e] : step * (red, v) Conf.t) =
 let pp_trace = Fmt.vbox @@ Trace.pp pp_stateconf (Fmt.box pp_v)
 
 module L = struct
-  let (@@) f arg = App {f;arg}
+  let (@@) f arg = App (f,arg)
   let (+) x y = Add [x;y]
   let add l = Add l
   let lam f = value (Lam f)
