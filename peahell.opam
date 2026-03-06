@@ -22,4 +22,6 @@ depends: [
   "linenoise"
   "trace"
   "trace-fuchsia"
+  "lun"
+  "multicont"
 ]
