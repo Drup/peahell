@@ -1,32 +1,3 @@
-module Expr (E : sig
-    type expr
-    type context
-    val plug : outter:context -> inner:context -> context
-    val pp_expr : Format.formatter -> expr -> unit
-    val pp_context : Format.formatter -> context -> unit
-  end) = struct
-  open E
-  
-  type t = { ctx: E.context ; view : E.expr }
-
-  let mk ctx view = { ctx; view }
-  
-  let inside outter { ctx; view }=
-    let ctx = E.plug ~outter ~inner:ctx in
-    { ctx; view }
-  
-  module Infix = struct
-    let (^>) ctx v = mk ctx v
-    let (^>>) ctx e = inside ctx e
-  end
-  include Infix
-   
-  let view e = e.view
-  let ctx e = e.ctx
-
-  let pp fmt {ctx;view} =
-    Fmt.pf fmt "@[@[%a@] ▷@ @[%a@]@]" pp_context ctx pp_expr view
-end
 
 module Trace = struct
   type ('state, 'v) node =
@@ -138,7 +109,7 @@ module NI = struct
     v : 'a
   }
 
-  let pp (ppf : 'a Fmt.t) fmt mv = ppf fmt mv.v
+  (* let pp (ppf : 'a Fmt.t) fmt mv = ppf fmt mv.v *)
 
   let mk (type a) ~snapshot v =
     let module M = struct
@@ -196,13 +167,13 @@ module Conf = struct
 end
 
 module Arg = struct
-  type (_,_) one =
-    | I : 'a -> ('a Conf.imm -> 'x, 'x) one
-    | M : 'a NI.state -> ('a Conf.mut -> 'x, 'x) one
+  type (_) one =
+    | I : 'a -> ('a Conf.imm) one
+    | M : 'a NI.state -> ('a Conf.mut) one
 
   type (_,_) t =
     | [] : ('a, 'a) t
-    | (::) : ('a, 'b) one * ('b, 'c) t -> ('a, 'c) t
+    | (::) : ('a) one * ('b, 'c) t -> ('a -> 'b, 'c) t
 
   let i x = I x
   let m ~snapshot x = M (NI.mk ~snapshot x)
@@ -274,18 +245,23 @@ module Make (X : sig
 
     let tasks l =
       List.map snd @@ tasks_assoc @@ List.mapi (fun i x -> i, x) l
-    let map f l =
+    let map_nd f l =
       List.map snd @@ tasks_assoc @@ List.mapi (fun i x -> i, fun () -> f x) l
         
     let pair f1 f2 =
-      let[@warning "-8"] [v1, v2] = tasks [f1; f2] in
-      v1, v2
+      if int 1 = 0 then
+        let v1 = f1 () in
+        let v2 = f2 () in
+        v1, v2
+      else
+        let v2 = f2 () in
+        let v1 = f1 () in
+        v1, v2
 
-    let (|||) = pair
+    let (|||) f1 f2 = one_of [f1;f2] ()
+    let (&&&) = pair
 
   end
-
-  type ('a, 'x) trace = (X.step * ('a, 'x) Conf.t, 'x) Trace.t
 
   module S = Effect.Shallow
   
@@ -313,7 +289,9 @@ module Make (X : sig
     go (S.fiber @@ Conf.State.run conf) f
 
 
-  let trace ?(random=Random.State.make_self_init ()) f l : _ Trace.t =
+  type ('a, 'x) trace = (X.step * ('a, 'x) Conf.t, 'x) Trace.t
+
+  let trace ?(random=Random.State.make_self_init ()) f l : _ trace =
     let conf = Arg.conf l in
     let retc x = Trace.Return x in
     let exnc err = Trace.Error err in
@@ -339,9 +317,12 @@ module Make (X : sig
     in
     go (S.fiber @@ Conf.State.run conf) f
 
+
+  type ('a, 'x) tree = (X.step * ('a, 'x) Conf.t, 'x) Tree.t
+  
   module MS = Multicont.Shallow
 
-  let tree f l : _ Tree.t =
+  let tree f l : _ tree =
     let conf = Arg.conf l in
     let retc x = Tree.Return x in
     let exnc err = Tree.Error err in
