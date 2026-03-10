@@ -1,5 +1,5 @@
 (executables
  (names lambda ccs)
  (libraries fmt trace peahell)
- (preprocess (pps ppx_deriving.show ppx_lun))
+ (preprocess (pps ppx_deriving.show ppx_peahell ppx_lun))
 )

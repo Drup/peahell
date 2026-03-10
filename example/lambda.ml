@@ -1,4 +1,4 @@
-open Peahell__.Eval
+open Peahell.Eval
 
 type v = Int of int | Lam of (expr -> expr)
 and expr =
@@ -28,11 +28,9 @@ let stepV s e0 ~as_:x =
   x
 
 let rec eval st e0 =
-  match I.view e0 with
-  | V v -> v
+  match%lensed e0 with
+  | V v -> I.view v
   | App (f, arg) ->
-    let f = I.sub e0 Lun.(expr_App >> fst) f in
-    let arg = I.sub e0 Lun.(expr_App >> snd) arg in
     let f' = eval st f in
     let arg' = eval st arg in
     begin match f' with
@@ -43,7 +41,6 @@ let rec eval st e0 =
       | _ -> failwith "Not a lambda"
     end
   | Add l ->
-    let l = I.sub e0 expr_Add l in
     let l' = I.list l in
     let vs = List.map (eval st) l' in
     let v = sum vs in
@@ -52,7 +49,6 @@ let rec eval st e0 =
     let v = !st in
     stepV "get" e0 ~as_:v
   | Set e ->
-    let e = I.sub e0 expr_Set e in
     let v = eval st e in
     st := v;
     stepV "set" e0 ~as_:v

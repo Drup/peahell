@@ -25,23 +25,22 @@ let compatible_lbl l1 l2 = match l1, l2 with
   | Send n, Recv n' | Recv n', Send n -> n = n'
   | _ -> false
 
-let rec try_eval p0 =
-  match I.view p0 with
+let rec head p0 =
+  match%lensed p0 with
   | Nop -> stuck "nop"
-  | Lbl (l, p) -> l, p
+  | Lbl (l, p) ->
+    I.view l, I.view p
   | Par (p1, p2) ->
-    let p1 = I.sub p0 Lun.(proc_Par >> fst) p1 in
-    let p2 = I.sub p0 Lun.(proc_Par >> snd) p2 in
     Interp.Choice.one_of [
       (fun () ->
-         let l, p1 = try_eval p1 in l, Par (p1, I.view p2)
+         let l, p1 = head p1 in l, Par (p1, I.view p2)
       );
       (fun () ->
-         let l, p2 = try_eval p2 in l, Par (I.view p1, p2)
+         let l, p2 = head p2 in l, Par (I.view p1, p2)
       );
       (fun () ->
-         let l1, p1 = try_eval p1 in
-         let l2, p2 = try_eval p2 in
+         let l1, p1 = head p1 in
+         let l2, p2 = head p2 in
          if compatible_lbl l1 l2 then
            Tau, Par (p1, p2)
          else
@@ -49,18 +48,17 @@ let rec try_eval p0 =
       )
     ] ()
   | Choice p ->
-    let p = I.sub p0 proc_Choice p in
-    try_eval @@ Interp.Choice.one_of @@ I.list p
+    head @@ Interp.Choice.one_of @@ I.list p
   | Mu (n, p) ->
-    let p = I.sub p0 Lun.(proc_Mu >> snd) p in
-    let l, p' = try_eval p in
+    let n = I.view n in
+    let l, p' = head p in
     match l with
     | Send n' when n = n' -> stuck "Bound %a" pp_lbl l
     | Recv n' when n = n' -> stuck "Bound %a" pp_lbl l
     | _ -> l, Mu (n, p')
 
 and eval p =
-  let l, p' = try_eval p in
+  let l, p' = head p in
   let p' = I.set p p' in
   Interp.step l;
   eval p'

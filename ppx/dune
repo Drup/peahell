@@ -1,0 +1,8 @@
+(library
+ (name ppx_peahell)
+ (public_name ppx_peahell)
+ (kind ppx_rewriter)
+ (ppx_runtime_libraries peahell)
+ (libraries ppxlib)
+ (preprocess (pps ppxlib.metaquot))
+)
