@@ -68,15 +68,17 @@ module Arg : sig
   val i : 'a -> ('a I.t) one
   (** [i v] is a lensed expression argument whose initial value is [v]. *)
 
-  val m : snapshot:('a -> 'a) -> 'a -> 'a one
-  (** [m ~snapshot v] is a mutable argument whose initial value is [v].
-      [snapshot] is used to record the configuration in traces. *)
+  val pure : 'a -> 'a one
+  (** [pure v] is an immutable argument. *)
 
   val ref : 'a -> ('a ref) one
   (** [ref v] is a mutable argument specialized for {!Stdlib.ref}erences. *)
 
-  val pure : 'a -> 'a one
-  (** [pure v] is an immutable argument. *)
+  val m : snapshot:('a -> 'a) -> save:('a -> 'b) -> restore:('a -> 'b -> unit) -> 'a -> 'a one
+  (** [m ~snapshot ~save ~restore v] is a mutable argument whose initial value is [v].
+      [snapshot] is used to record the configuration in traces.
+      [save] and [restore] are used for multiple continuation in branches.
+  *)
 
   type ('f,'r) t =
     | [] : ('a, 'a) t

@@ -90,24 +90,21 @@ end
 
 module NI = struct 
 
-  module type S = sig
-    type t
-    val snapshot : t -> t
-  end
-
-  type 'a state = {
-    m : (module S with type t = 'a);
-    v : 'a
-  }
+  type 'st t = NI : {
+    v : 'st ;
+    snapshot : 'st -> 'st ;
+    save : 'st -> 'copy ;
+    restore : 'st -> 'copy -> unit ;
+  } -> 'st t
 
   (* let pp (ppf : 'a Fmt.t) fmt mv = ppf fmt mv.v *)
 
-  let mk (type a) ~snapshot v =
-    let module M = struct
-      type t = a
-      let snapshot = snapshot
-    end in
-    { m = (module M) ; v}
+  let mk ~snapshot ~restore ~save v = NI {
+      snapshot ;
+      restore ;
+      save ;
+      v ;
+    }
 
 end
 
@@ -132,7 +129,7 @@ module Conf = struct
 
     type (_,_) one =
       | I : 'a ref -> ('a imm -> 'x, 'x) one
-      | M : 'a NI.state -> ('a mut -> 'x, 'x) one
+      | M : 'st NI.t -> ('st mut -> 'x, 'x) one
 
     type (_,_) t =
       | [] : ('a, 'a) t
@@ -143,14 +140,45 @@ module Conf = struct
       = fun l f -> match l with
         | [] -> f
         | I r :: t -> run t (f @@ I.init r )
-        | M mv :: t -> run t (f @@ mv.v )
+        | M NI mv :: t -> run t (f @@ mv.v )
 
     let rec snapshot : type a x . (a, x) t -> (a, x) Val.t = function
       | [] -> []
       | I r :: t -> I !r :: snapshot t
-      | M {m = (module M); v} :: t ->
-        M (M.snapshot v) :: snapshot t
+      | M NI mv :: t ->
+        M (mv.snapshot mv.v) :: snapshot t
 
+  end
+
+  module Backtrack = struct
+    type 'st copy = C : {
+        copy : 'copy ;
+        restore : 'st -> 'copy -> unit ;
+      } -> 'st copy
+
+    type (_,_) one =
+      | I : 'a -> ('a imm -> 'x, 'x) one
+      | M : 'st copy -> ('st mut -> 'x, 'x) one
+
+    type (_,_) t =
+      | [] : ('a, 'a) t
+      | (::) : ('a, 'b) one * ('b, 'c) t -> ('a, 'c) t
+
+    let rec checkpoint : type a x . (a, x) State.t -> (a, x) t = function
+      | [] -> []
+      | I r :: t -> I !r :: checkpoint t
+      | M NI {save; restore; v; _} :: t ->
+        M (C {restore ; copy = save v} ) :: checkpoint t
+
+    let rec restore : type a x . (a, x) State.t -> (a, x) t -> unit =
+      fun st copy -> match st, copy with
+        | [], [] -> ()
+        | I r :: t, I v :: t' -> r := v; restore t t'
+        | M NI ni :: t, M C mc :: t' ->
+          mc.restore ni.v mc.copy; restore t t'
+        | _, _ -> assert false (* TODO explain to the typechecker. *)
+
+    
   end
 
   include Val
@@ -160,22 +188,25 @@ end
 module Arg = struct
   type (_) one =
     | I : 'a -> ('a Conf.imm) one
-    | M : 'a NI.state -> ('a Conf.mut) one
+    | M : 'a NI.t -> ('a Conf.mut) one
 
   type (_,_) t =
     | [] : ('a, 'a) t
     | (::) : ('a) one * ('b, 'c) t -> ('a -> 'b, 'c) t
 
   let i x = I x
-  let m ~snapshot x = M (NI.mk ~snapshot x)
+  let m ~snapshot ~save ~restore x = M (NI.mk ~snapshot ~save ~restore x)
 
   let ref v0 =
     let snapshot x = ref !x in
-    m ~snapshot (ref v0)
+    let save x = !x in
+    let restore r x = r := x in
+    m ~snapshot ~save ~restore (ref v0)
 
   let pure v =
     let snapshot x = x in
-    m ~snapshot v 
+    let save x = x and restore _ _ = () in
+    m ~snapshot ~save ~restore v 
 
   let rec conf : type a x . (a, x) t -> (a, x) Conf.State.t = function
     | [] -> []
@@ -334,8 +365,11 @@ module Make (X : sig
                 go k () ()
               )
             | Choice n -> Some (fun (k : (b, _) S.continuation) ->
+                let copy = Conf.Backtrack.checkpoint conf in
                 let k = Multicont.Shallow.promote k in
-                Tree.Choice (List.init n (fun v -> go k v))
+                Tree.Choice (List.init n (fun v ->
+                    Conf.Backtrack.restore conf copy;
+                    go k v))
               )
             | _ -> None
         }
