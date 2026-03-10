@@ -203,6 +203,25 @@ module Arg = struct
     let restore r x = r := x in
     m ~snapshot ~save ~restore (ref v0)
 
+  (* Todo make the array immutable. *)
+  let array a0 =
+    let snapshot x = Array.copy x in
+    let save x = Array.copy x in
+    let restore a v =
+      assert (Array.length a = Array.length v);
+      Array.blit v 0 a 0 (Array.length a)
+    in
+    m ~snapshot ~save ~restore a0
+
+  let hashtbl h0 =
+    let snapshot h = Hashtbl.copy h in
+    let save h = List.of_seq @@ Hashtbl.to_seq h in
+    let restore h l =
+      Hashtbl.filter_map_inplace
+        (fun k _ -> List.assq_opt k l) h
+    in
+    m ~snapshot ~save ~restore h0
+
   let pure v =
     let snapshot x = x in
     let save x = x and restore _ _ = () in

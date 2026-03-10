@@ -72,7 +72,13 @@ module Arg : sig
   (** [pure v] is an immutable argument. *)
 
   val ref : 'a -> ('a ref) one
-  (** [ref v] is a mutable argument specialized for {!Stdlib.ref}erences. *)
+  (** [ref v] is a mutable reference argument specialized for  *)
+
+  val array : 'a array -> ('a array) one
+  (** [array a] is a mutable {!Array} argument. *)
+
+  val hashtbl : ('a, 'b) Hashtbl.t -> ('a, 'b) Hashtbl.t one
+  (** [array a] is a mutable {!Hashtbl} argument. *)
 
   val m : snapshot:('a -> 'a) -> save:('a -> 'b) -> restore:('a -> 'b -> unit) -> 'a -> 'a one
   (** [m ~snapshot ~save ~restore v] is a mutable argument whose initial value is [v].
