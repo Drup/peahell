@@ -7,7 +7,7 @@ and expr =
   | Add of expr list
   | Get
   | Set of expr
-[@@deriving show { with_path = false }, lun]
+[@@deriving show { with_path = false }]
 
 let value x = V x
 

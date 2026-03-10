@@ -10,7 +10,7 @@ and proc =
   | Mu of name * proc
   | Lbl of lbl * proc
   | Par of proc * proc
-[@@deriving show { with_path = false }, lun]
+[@@deriving show { with_path = false }]
 
 (** The type of our reduction and our step *)
 type red = proc I.t -> unit
