@@ -18,7 +18,7 @@ let find_vars p =
   let o = object
     inherit [_] Ast_traverse.fold as super
     method! pattern_desc p acc = match p with
-      | Ppat_var l -> VMap.add l.txt l acc
+      | Ppat_var v | Ppat_alias (_, v) -> VMap.add v.txt v acc
       | _ -> super#pattern_desc p acc
   end
   in List.map snd @@ VMap.bindings @@ o#pattern p VMap.empty
@@ -26,13 +26,31 @@ let find_vars p =
 (** Erase all the variables except the one provided. *)
 let erase_vars var p = object
   inherit Ast_traverse.map as super
-  method! pattern_desc = function
-    | Ppat_var v when v.txt = var ->
-      Ppat_var v
-    | Ppat_var _ ->
+  method! pattern_desc desc = match desc with
+    | Ppat_var v | Ppat_alias (_, v) when v.txt <> var ->
       Ppat_any
-    | p -> super#pattern_desc p
+    | _ ->
+      super#pattern_desc desc
 end#pattern p
+
+(** Simplify a pattern to avoid talking about anything except bound variables.
+*)
+let simplify_pattern p =
+  let o = object
+    inherit [bool] Ast_traverse.fold_map as super
+    method! pattern_desc desc has_var = match desc with
+      | Ppat_var _ as desc ->
+        desc, true
+      | Ppat_alias (_, v) ->
+        Ppat_var v, true
+      | p ->
+        let p', has_var' = super#pattern_desc p false in
+        if has_var' then
+          p', true
+        else
+          Ppat_any, has_var
+  end
+  in fst @@ o#pattern p false
 
 let expander ~ctxt matchee cases =
   let loc =
@@ -60,6 +78,7 @@ let expander ~ctxt matchee cases =
                 ppat_var ~loc:v.loc v
               in
               let lense_pat =
+                simplify_pattern @@
                 erase_vars v.txt case.pc_lhs
               in
               let expr =
