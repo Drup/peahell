@@ -4,5 +4,4 @@
  (kind ppx_rewriter)
  (ppx_runtime_libraries peahell)
  (libraries ppxlib)
- (preprocess (pps ppxlib.metaquot))
 )

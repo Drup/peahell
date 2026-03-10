@@ -2,15 +2,15 @@ open Ppxlib
 
 open Ast_builder.Default
 
-module VarSet = Set.Make(String)
+module VMap = Map.Make(String)
 
 let lun_pat ~loc p =
   let lbl = Located.mk ~loc "lun" in
   pexp_extension ~loc (lbl, PPat (p, None))
 
-let eident ~loc s =
+let elident ~loc s =
   pexp_ident ~loc @@ Located.mk ~loc @@ Longident.parse s
-let tident ~loc s l =
+let tlident ~loc s l =
   ptyp_constr ~loc (Located.mk ~loc @@ Longident.parse s) l
 
 (** Return all the variables in a pattern. *)
@@ -18,19 +18,21 @@ let find_vars p =
   let o = object
     inherit [_] Ast_traverse.fold as super
     method! pattern_desc p acc = match p with
-      | Ppat_var l -> VarSet.add l.txt acc
+      | Ppat_var l -> VMap.add l.txt l acc
       | _ -> super#pattern_desc p acc
   end
-  in VarSet.to_list @@ o#pattern p VarSet.empty
+  in List.map snd @@ VMap.bindings @@ o#pattern p VMap.empty
 
 (** Erase all the variables except the one provided. *)
-let erase_all_vars_except var p = object
+let erase_vars var p = object
   inherit Ast_traverse.map as super
   method! pattern_desc = function
-    | Ppat_var v when v.txt <> var -> Ppat_any
+    | Ppat_var v when v.txt = var ->
+      Ppat_var v
+    | Ppat_var _ ->
+      Ppat_any
     | p -> super#pattern_desc p
 end#pattern p
-
 
 let expander ~ctxt matchee cases =
   let loc =
@@ -40,11 +42,11 @@ let expander ~ctxt matchee cases =
   let new_matchee =
     let loc = matchee.pexp_loc in
     pexp_apply ~loc
-      (eident ~loc "Peahell.Eval.I.view")
+      (elident ~loc "Peahell.Eval.I.view")
       [Nolabel,
        pexp_constraint ~loc 
          matchee
-         (tident ~loc "Peahell.Eval.I.t" [ptyp_any ~loc])
+         (tlident ~loc "Peahell.Eval.I.t" [ptyp_any ~loc])
       ]
   in
   let cases =
@@ -53,20 +55,22 @@ let expander ~ctxt matchee cases =
         let vars = find_vars case.pc_lhs in
         let vbs =
           List.map (fun v ->
-              let pat = pvar ~loc v in
+              let pat =
+                Merlin_helpers.focus_pattern @@
+                ppat_var ~loc:v.loc v
+              in
               let lense_pat =
-                erase_all_vars_except v case.pc_lhs
+                erase_vars v.txt case.pc_lhs
               in
               let expr =
                 pexp_apply ~loc
-                  (eident ~loc "Peahell.Eval.I.sub")
+                  (elident ~loc "Peahell.Eval.I.sub")
                   [ Nolabel, matchee;
                     Nolabel, lun_pat ~loc lense_pat ;
-                    Nolabel, evar ~loc v ]
+                    Nolabel, pexp_ident ~loc:v.loc @@ Located.map_lident v ]
               in
               Ast_helper.Vb.mk
                 ~loc
-                ~attrs:[Merlin_helpers.hide_attribute]
                 pat expr
             ) vars
         in
