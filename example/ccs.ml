@@ -7,7 +7,7 @@ type lbl = Tau | Send of name | Recv of name
 and proc =
   | Nop
   | Choice of proc list
-  | Mu of name * proc
+  | Nu of name * proc
   | Lbl of lbl * proc
   | Par of proc * proc
 [@@deriving show { with_path = false }]
@@ -49,13 +49,13 @@ let rec head p0 =
     ] ()
   | Choice p ->
     head @@ Interp.Choice.one_of @@ I.list p
-  | Mu (n, p) ->
+  | Nu (n, p) ->
     let n = I.view n in
     let l, p' = head p in
     match l with
     | Send n' when n = n' -> stuck "Bound %a" pp_lbl l
     | Recv n' when n = n' -> stuck "Bound %a" pp_lbl l
-    | _ -> l, Mu (n, p')
+    | _ -> l, Nu (n, p')
 
 and eval p =
   let l, p' = head p in
@@ -77,8 +77,8 @@ module P = struct
   let (+) p1 p2 = Choice [p1; p2]
   let ( ** ) l p = Lbl (l, p)
 
-  let mu n p = Mu (n, p)
-  let (let*) n f = Mu (n, f @@ Send n)
+  let mu n p = Nu (n, p)
+  let (let*) n f = Nu (n, f @@ Send n)
   let (~-) = function Tau -> Tau | Send n -> Recv n | Recv n -> Send n
   let nop = Nop
 end

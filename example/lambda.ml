@@ -1,6 +1,6 @@
 open Peahell.Eval
 
-type v = Int of int | Lam of (expr -> expr)
+type v = Int of int | Lam of (v -> expr)
 and expr =
   | V of v
   | App of expr * expr
@@ -22,7 +22,7 @@ let sum vs =
       match v with Int i -> s+i | _ -> failwith "not an int"
     ) 0 vs)
 
-let stepV s e0 ~as_:x =
+let stepV s e0 x =
   let _ = I.set e0 @@ value x in
   Interp.step s;
   x
@@ -35,7 +35,7 @@ let rec eval st e0 =
     let arg' = eval st arg in
     begin match f' with
       | Lam l ->
-        let e' = I.set e0 @@ l (value arg') in
+        let e' = I.set e0 (l arg') in
         Interp.step "app";
         eval st e'
       | _ -> failwith "Not a lambda"
@@ -44,14 +44,14 @@ let rec eval st e0 =
     let l' = I.list l in
     let vs = List.map (eval st) l' in
     let v = sum vs in
-    stepV "add" e0 ~as_:v
+    stepV "add" e0 v
   | Get ->
     let v = !st in
-    stepV "get" e0 ~as_:v
+    stepV "get" e0 v
   | Set e ->
     let v = eval st e in
     st := v;
-    stepV "set" e0 ~as_:v
+    stepV "set" e0 v
 
 (** Printing the trace *)
 
@@ -70,7 +70,7 @@ module L = struct
 end
 
 let e0 =
-  L.( lam (fun x -> x + Get + i 2) @@ Set (i 3))
+  L.( lam (fun x -> V x + Get + i 2) @@ Set (i 3))
 
 let () =
   Fmt.pr "Running %a@." pp_expr e0;
