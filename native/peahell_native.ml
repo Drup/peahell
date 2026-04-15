@@ -117,6 +117,7 @@ module Make (L : Language) = struct
 
   (** Expect mode *)
   let expect ctx filename =
+    let has_errors = ref false in
     match L.expect_parser with
     | Some (open_string, end_string, f) ->
       let ic = open_in filename in
@@ -132,6 +133,7 @@ module Make (L : Language) = struct
             try L.exec use_file ctx input
             with err ->
               Format.printf "%a" Report.report_exception err;
+              has_errors := true; 
               ctx
           in
           Format.print_flush ();
@@ -139,7 +141,8 @@ module Make (L : Language) = struct
           print_string end_string;
           walk_sections index2 ctx t
       in
-      walk_sections 0 ctx l
+      walk_sections 0 ctx l;
+      if !has_errors then Error () else Ok ()
     | None ->
       Report.fail "I'm sorry, this language does not support expect mode"
   
@@ -175,14 +178,15 @@ module Make (L : Language) = struct
       | Debug, File s -> Trace_fuchsia.setup ~out:(`File s) ()
       | _ -> ()
     end;
-    try
-      f ();
-      Trace.shutdown ();
-      exit 0
-    with err ->
-      Format.eprintf "%a@." Report.report_exception err;
-      Trace.shutdown ();
-      exit 1 
+    let errno = match f () with
+      | Ok () -> 0
+      | Error () -> 1
+      | exception err -> 
+        Format.eprintf "%a@." Report.report_exception err;
+        1
+    in
+    Trace.shutdown ();
+    exit errno
   
   (** Main program *)
   let main () =
@@ -204,10 +208,11 @@ module Make (L : Language) = struct
       match !mode with
       | Batch ->
         let _ = batch L.initial_environment !files in
-        ()
+        Ok ()
       | Interactive -> 
         let ctx = batch L.initial_environment !files in
-        toplevel ctx
+        toplevel ctx;
+        Ok ()
       | Expect ->
         let file = match !files with
           | [fn] -> fn
