@@ -18,18 +18,19 @@ let pp ppf loc =
   | Nowhere ->
     Format.fprintf ppf "unknown location"
   | File filename ->
-    Format.fprintf ppf "file %S" filename
+    Format.fprintf ppf "File %S" filename
   | Location (begin_pos, end_pos) ->
     let begin_char = begin_pos.Lexing.pos_cnum - begin_pos.Lexing.pos_bol in
     let end_char = end_pos.Lexing.pos_cnum - begin_pos.Lexing.pos_bol in
     let begin_line = begin_pos.Lexing.pos_lnum in
+    let end_line = end_pos.Lexing.pos_lnum in
     let filename = begin_pos.Lexing.pos_fname in
     if String.length filename != 0 then
-      Format.fprintf ppf "file %S, line %d, characters %d-%d"
-        filename begin_line begin_char end_char
+      Format.fprintf ppf "File %S, lines %d-%d, characters %d-%d"
+        filename begin_line end_line begin_char end_char
     else
-      Format.fprintf ppf "line %d, characters %d-%d"
-        (begin_line - 1) begin_char end_char
+      Format.fprintf ppf "lines %d-%d, characters %d-%d"
+        (begin_line - 1) end_line begin_char end_char
 
 let input_file : string option ref = ref None
 let input_file_as_loc () =
